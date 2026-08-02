@@ -27,6 +27,16 @@ fn known_folder_path(csidl: i32) -> Option<String> {
     }
 }
 
+/// Resolve a startup folder path by label ("user_startup" | "common_startup").
+#[cfg(windows)]
+pub fn startup_folder_path(label: &str) -> Option<String> {
+    match label {
+        "user_startup" => known_folder_path(CSIDL_STARTUP),
+        "common_startup" => known_folder_path(CSIDL_COMMON_STARTUP),
+        _ => None,
+    }
+}
+
 /// Enumerate .lnk/.exe/.cmd/.bat files in startup folders.
 #[cfg(windows)]
 pub fn enumerate_startup_folders() -> Vec<RawEntry> {

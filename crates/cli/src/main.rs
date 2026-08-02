@@ -1,13 +1,16 @@
-//! bootkeeper CLI — read chain (M1).
+//! bootkeeper CLI — read chain (M1) + write chain (M2).
 //!
-//! All commands output JSON: AI agents parse this directly. Write commands
-//! arrive in M2 with the helper confirmation flow.
+//! Read commands output JSON directly. Write commands build a request file,
+//! launch the elevated helper (ShellExecuteW runas), wait for the result
+//! file, and print the outcome. The helper shows the confirmation dialog;
+//! without a user "Yes" nothing is executed.
 
 use std::path::PathBuf;
 
 use bootkeeper_core::model::{Category, Signature};
 use bootkeeper_core::{enrich, rules, snapshot::SnapshotStore, StartupItem};
 use clap::{Parser, Subcommand};
+use serde_json::json;
 
 #[derive(Parser)]
 #[command(name = "bootkeeper", version, about = "Windows autostart manager")]
@@ -25,14 +28,16 @@ enum Commands {
         category: Option<String>,
     },
     /// Show one item by id.
-    Get {
-        id: String,
-    },
+    Get { id: String },
     /// AI-friendly analysis: items with risk + reasons (rules decide risk).
     Analyze {
         #[arg(long)]
         category: Option<String>,
     },
+    /// Disable a startup item (renames to .disabled). Requires elevation + confirmation.
+    Disable { id: String },
+    /// Enable a startup item (renames back). Requires elevation + confirmation.
+    Enable { id: String },
     /// Snapshot store operations.
     Snapshot {
         #[command(subcommand)]
@@ -54,6 +59,8 @@ fn main() {
         Commands::List { category } => cmd_list(category.as_deref()),
         Commands::Get { id } => cmd_get(&id),
         Commands::Analyze { category } => cmd_analyze(category.as_deref()),
+        Commands::Disable { id } => cmd_write(&id, "disable"),
+        Commands::Enable { id } => cmd_write(&id, "enable"),
         Commands::Snapshot { action } => cmd_snapshot(action),
     };
     match result {
@@ -66,16 +73,22 @@ fn main() {
 }
 
 /// Where snapshots live. M2 will allow overriding via env/config.
-fn snapshot_dir() -> PathBuf {
+fn data_root() -> PathBuf {
     std::env::var_os("BOOTKEEPER_DATA")
         .map(PathBuf::from)
         .unwrap_or_else(|| {
             #[cfg(windows)]
-            let base = std::env::var("APPDATA").map(PathBuf::from).unwrap_or_else(|_| PathBuf::from("."));
+            let base = std::env::var("APPDATA")
+                .map(PathBuf::from)
+                .unwrap_or_else(|_| PathBuf::from("."));
             #[cfg(not(windows))]
             let base = PathBuf::from(".");
-            base.join("BootKeeper").join("snapshots")
+            base.join("BootKeeper")
         })
+}
+
+fn snapshot_dir() -> PathBuf {
+    data_root().join("snapshots")
 }
 
 fn category_from_str(s: &str) -> Option<Category> {
@@ -92,7 +105,11 @@ fn verifier() -> impl Fn(&str) -> Signature {
     #[cfg(windows)]
     {
         |cmd| {
-            let path = cmd.trim_matches('"').split_whitespace().next().unwrap_or("");
+            let path = cmd
+                .trim_matches('"')
+                .split_whitespace()
+                .next()
+                .unwrap_or("");
             if path.is_empty() {
                 Signature::Unknown
             } else {
@@ -117,10 +134,8 @@ fn all_items() -> Vec<StartupItem> {
 }
 
 fn cmd_list(category: Option<&str>) -> Result<String, String> {
-    let cat = category.map(|s| category_from_str(s).ok_or_else(|| format!("unknown category: {s}")));
-    let cat = match cat {
-        Some(Ok(c)) => Some(c),
-        Some(Err(e)) => return Err(e),
+    let cat = match category {
+        Some(s) => Some(category_from_str(s).ok_or_else(|| format!("unknown category: {s}"))?),
         None => None,
     };
     let items: Vec<StartupItem> = all_items()
@@ -156,7 +171,7 @@ fn cmd_analyze(category: Option<&str>) -> Result<String, String> {
         .map(|r| {
             let sig = v(&r.command);
             let rule = rules::evaluate(r, sig, None);
-            serde_json::json!({
+            json!({
                 "id": StartupItem::build_id(r.category, &r.location, &r.name),
                 "category": r.category.as_str(),
                 "name": r.name,
@@ -171,13 +186,125 @@ fn cmd_analyze(category: Option<&str>) -> Result<String, String> {
     serde_json::to_string_pretty(&analyzed).map_err(|e| e.to_string())
 }
 
+/// Write chain: build request, launch elevated helper, wait, read result.
+fn cmd_write(id: &str, op_name: &str) -> Result<String, String> {
+    #[cfg(not(windows))]
+    {
+        let _ = (id, op_name);
+        return Err("write commands are Windows-only (bootkeeper-helper)".into());
+    }
+
+    #[cfg(windows)]
+    {
+
+        let dir = data_root().join("tmp");
+        std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+        let req_path = dir.join(format!("{op_name}-{}.json", std::process::id()));
+        let res_path = dir.join(format!("result-{}.json", std::process::id()));
+
+        let op = match op_name {
+            "disable" => bootkeeper_core::WriteOp::Disable {
+                item_id: id.to_string(),
+            },
+            "enable" => bootkeeper_core::WriteOp::Enable {
+                item_id: id.to_string(),
+            },
+            _ => return Err(format!("unknown write op: {op_name}")),
+        };
+        let request = json!({
+            "operation": op,
+            "snapshot_dir": snapshot_dir().to_string_lossy(),
+        });
+        std::fs::write(&req_path, serde_json::to_vec_pretty(&request).map_err(|e| e.to_string())?)
+            .map_err(|e| e.to_string())?;
+
+        // Launch the helper elevated via ShellExecuteW runas.
+        launch_helper_elevated(&req_path, &res_path)?;
+
+        // Wait for the result file.
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(120);
+        loop {
+            if res_path.exists() {
+                break;
+            }
+            if std::time::Instant::now() > deadline {
+                return Err("timed out waiting for helper (user may not have confirmed)".into());
+            }
+            std::thread::sleep(std::time::Duration::from_millis(300));
+        }
+
+        let bytes = std::fs::read(&res_path).map_err(|e| e.to_string())?;
+        let _ = std::fs::remove_file(&req_path);
+        let _ = std::fs::remove_file(&res_path);
+        let result: bootkeeper_core::WriteResult =
+            serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
+        serde_json::to_string_pretty(&result).map_err(|e| e.to_string())
+    }
+}
+
+/// Launch the helper elevated via ShellExecuteW "runas" (UAC prompt).
+/// Blocks until the elevated process exits.
+#[cfg(windows)]
+fn launch_helper_elevated(
+    req_path: &std::path::Path,
+    res_path: &std::path::Path,
+) -> Result<(), String> {
+    use windows::core::HSTRING;
+    use windows::Win32::UI::WindowsAndMessaging::SW_HIDE;
+    use windows::Win32::UI::Shell::ShellExecuteW;
+
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let dir = exe.parent().ok_or_else(|| "no exe dir".to_string())?;
+    let helper = dir.join("bootkeeper-helper.exe");
+
+    let verb = HSTRING::from("runas");
+    let file = HSTRING::from(helper.to_string_lossy().as_ref());
+    let params = HSTRING::from(format!(
+        "\"{}\" \"{}\"",
+        req_path.to_string_lossy(),
+        res_path.to_string_lossy()
+    ));
+    let directory = HSTRING::from(dir.to_string_lossy().as_ref());
+
+    let hinst = unsafe {
+        ShellExecuteW(
+            None,
+            &verb,
+            &file,
+            &params,
+            &directory,
+            SW_HIDE,
+        )
+    };
+    // HINSTANCE <= 32 means an error (see ShellExecute docs).
+    if hinst.0 as isize <= 32 {
+        return Err(format!(
+            "failed to launch helper (ShellExecuteW runas code {})",
+            hinst.0 as isize
+        ));
+    }
+
+    // Wait for the helper to finish writing the result. Poll the file
+    // instead of the process handle — simpler and avoids handle juggling.
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(120);
+    while !res_path.exists() {
+        if std::time::Instant::now() > deadline {
+            return Err("timed out waiting for helper".into());
+        }
+        std::thread::sleep(std::time::Duration::from_millis(300));
+    }
+    Ok(())
+}
+
 fn cmd_snapshot(action: SnapshotAction) -> Result<String, String> {
     let store = SnapshotStore::new(snapshot_dir());
     match action {
         SnapshotAction::List => {
             let snaps = store.list().map_err(|e| e.to_string())?;
-            let meta: Vec<serde_json::Value> =
-                snaps.iter().map(bootkeeper_core::snapshot::summarize).collect();
+            let meta: Vec<serde_json::Value> = snaps
+                .iter()
+                .map(bootkeeper_core::snapshot::summarize)
+                .collect();
             serde_json::to_string_pretty(&meta).map_err(|e| e.to_string())
         }
         SnapshotAction::Show { id } => {
@@ -193,7 +320,10 @@ mod tests {
 
     #[test]
     fn category_parse() {
-        assert_eq!(category_from_str("registry_run"), Some(Category::RegistryRun));
+        assert_eq!(
+            category_from_str("registry_run"),
+            Some(Category::RegistryRun)
+        );
         assert_eq!(category_from_str("bogus"), None);
     }
 

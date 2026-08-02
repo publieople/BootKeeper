@@ -7,12 +7,14 @@ pub mod model;
 pub mod rules;
 pub mod snapshot;
 pub mod windows;
+pub mod write;
 
 use thiserror::Error;
 
 pub use model::{Category, RawEntry, Risk, Signature, StartupItem};
 pub use rules::{evaluate, RuleResult};
 pub use snapshot::SnapshotStore;
+pub use write::{parse_item_id, WriteOp, WriteResult};
 
 /// Unified error type for the core crate.
 #[derive(Debug, Error)]
@@ -21,6 +23,8 @@ pub enum Error {
     Io(#[from] std::io::Error),
     #[error("json error: {0}")]
     Json(#[from] serde_json::Error),
+    #[error("{0}")]
+    Msg(String),
 }
 
 /// Build a fully-enriched StartupItem from a RawEntry.

@@ -75,6 +75,7 @@ dependencies = [
  "clap",
  "serde",
  "serde_json",
+ "windows",
 ]
 
 [[package]]
@@ -88,6 +89,16 @@ dependencies = [
  "uuid",
  "windows",
  "winreg",
+]
+
+[[package]]
+name = "bootkeeper-helper"
+version = "0.1.0"
+dependencies = [
+ "bootkeeper-core",
+ "serde",
+ "serde_json",
+ "windows",
 ]
 
 [[package]]

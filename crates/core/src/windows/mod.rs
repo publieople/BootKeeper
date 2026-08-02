@@ -4,14 +4,18 @@
 //! crate still compiles (and unit-tests run) on non-Windows hosts.
 
 #[cfg(windows)]
+pub mod ops;
+#[cfg(windows)]
 pub mod registry;
 #[cfg(windows)]
 pub mod scheduled_task;
 #[cfg(windows)]
-pub mod startup_folder;
-#[cfg(windows)]
 pub mod signature;
+#[cfg(windows)]
+pub mod startup_folder;
 
+#[cfg(windows)]
+pub use ops::{disable, enable};
 #[cfg(windows)]
 pub use registry::enumerate_registry_run;
 #[cfg(windows)]

@@ -1,18 +1,17 @@
 [package]
-name = "bootkeeper-cli"
-description = "BootKeeper CLI: read chain for AI agents and humans"
+name = "bootkeeper-helper"
+description = "BootKeeper elevated helper: confirm + execute write operations"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 
 [[bin]]
-name = "bootkeeper"
+name = "bootkeeper-helper"
 path = "src/main.rs"
 
 [dependencies]
 bootkeeper-core = { path = "../core" }
-clap.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 
