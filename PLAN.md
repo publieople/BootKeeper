@@ -110,15 +110,15 @@ AI agent → 读 SKILL.md/skill → 调 bootkeeper CLI → core crate
 - [x] 核心枚举实现（winreg + windows crate COM）
 - [x] 签名校验（WinVerifyTrust，只验有效性）
 - [x] i18n 规模（中/英，v1）
-- [ ] CLI 参数与 JSON 输出格式细节（M1）
+- [x] CLI 参数与 JSON 输出格式细节（M1）
 - [ ] token 存储（Windows Credential Manager / DPAPI vs 配置文件）（M1）
-- [ ] SKILL.md 编写与 agent 兼容性验证（M1）
+- [x] SKILL.md 编写（skills.sh 标准）
 - [ ] MCP 适配层（后置，包 CLI）
 
 ## 里程碑
 
 - **M0**：workspace 骨架 + core（枚举三件套 + 规则引擎 + 快照）
-- **M1**：CLI 跑通读链路（list/get/analyze/snapshot）+ SKILL.md
+- **M1**：CLI 跑通读链路（list/get/analyze/snapshot）+ SKILL.md ✅
 - **M2**：helper（提权 + 独立确认窗 + 写操作 + 硬确认 token）+ CLI 写命令
 - **M3**：GUI（Naive UI + MD3 + 中英 i18n）
 - **M4**：AI 全链路联调 + 快照恢复 + 打包发布 + MCP 适配层
