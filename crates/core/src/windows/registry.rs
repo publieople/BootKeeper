@@ -23,9 +23,8 @@ pub fn enumerate_registry_run() -> Vec<RawEntry> {
                 Ok(key) => {
                     for (name, value) in key.enum_values().flatten() {
                         // Run values are strings (REG_SZ / REG_EXPAND_SZ).
-                        let cmd = match value {
-                            winreg::RegValue { bytes, .. } => String::from_utf8_lossy(&bytes).to_string(),
-                        };
+                        let winreg::RegValue { bytes, .. } = value;
+                        let cmd = String::from_utf8_lossy(&bytes).to_string();
                         out.push(RawEntry::new(
                             Category::RegistryRun,
                             &key_path,
