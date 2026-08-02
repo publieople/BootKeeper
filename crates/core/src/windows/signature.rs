@@ -21,7 +21,7 @@ pub fn verify_file_signature(path: &str) -> Signature {
         .chain(std::iter::once(0))
         .collect();
 
-    let file_info = WINTRUST_FILE_INFO {
+    let mut file_info = WINTRUST_FILE_INFO {
         cbStruct: std::mem::size_of::<WINTRUST_FILE_INFO>() as u32,
         pcwszFilePath: PCWSTR(wide.as_ptr()),
         hFile: INVALID_HANDLE_VALUE,
@@ -35,9 +35,7 @@ pub fn verify_file_signature(path: &str) -> Signature {
         dwUnionChoice: WTD_CHOICE_FILE,
         ..Default::default()
     };
-    unsafe {
-        *data.Anonymous.pFile = file_info;
-    }
+    data.Anonymous.pFile = &mut file_info;
 
     let mut action = WINTRUST_ACTION_GENERIC_VERIFY_V2;
     let result = unsafe {
