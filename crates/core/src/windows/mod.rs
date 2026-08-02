@@ -15,7 +15,7 @@ pub mod signature;
 pub mod startup_folder;
 
 #[cfg(windows)]
-pub use ops::{disable, enable};
+pub use ops::{disable, enable, remove, restore};
 #[cfg(windows)]
 pub use registry::enumerate_registry_run;
 #[cfg(windows)]

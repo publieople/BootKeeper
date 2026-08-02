@@ -15,6 +15,7 @@ pub use model::{Category, RawEntry, Risk, Signature, StartupItem};
 pub use rules::{evaluate, RuleResult};
 pub use snapshot::SnapshotStore;
 pub use write::{parse_item_id, WriteOp, WriteResult};
+pub use model::SnapshotEntry;
 
 /// Unified error type for the core crate.
 #[derive(Debug, Error)]

@@ -38,6 +38,10 @@ enum Commands {
     Disable { id: String },
     /// Enable a startup item (renames back). Requires elevation + confirmation.
     Enable { id: String },
+    /// Remove a startup item (after snapshot backup). Requires elevation + confirmation.
+    Remove { id: String },
+    /// Restore an item from a snapshot. Requires elevation + confirmation.
+    Restore { snapshot_id: String, item_id: String },
     /// Snapshot store operations.
     Snapshot {
         #[command(subcommand)]
@@ -59,8 +63,12 @@ fn main() {
         Commands::List { category } => cmd_list(category.as_deref()),
         Commands::Get { id } => cmd_get(&id),
         Commands::Analyze { category } => cmd_analyze(category.as_deref()),
-        Commands::Disable { id } => cmd_write(&id, "disable"),
-        Commands::Enable { id } => cmd_write(&id, "enable"),
+        Commands::Disable { id } => cmd_write(&id, "disable", None),
+        Commands::Enable { id } => cmd_write(&id, "enable", None),
+        Commands::Remove { id } => cmd_write(&id, "remove", None),
+        Commands::Restore { snapshot_id, item_id } => {
+            cmd_write(&item_id, "restore", Some(&snapshot_id))
+        }
         Commands::Snapshot { action } => cmd_snapshot(action),
     };
     match result {
@@ -187,10 +195,10 @@ fn cmd_analyze(category: Option<&str>) -> Result<String, String> {
 }
 
 /// Write chain: build request, launch elevated helper, wait, read result.
-fn cmd_write(id: &str, op_name: &str) -> Result<String, String> {
+fn cmd_write(id: &str, op_name: &str, restore_snapshot_id: Option<&str>) -> Result<String, String> {
     #[cfg(not(windows))]
     {
-        let _ = (id, op_name);
+        let _ = (id, op_name, restore_snapshot_id);
         return Err("write commands are Windows-only (bootkeeper-helper)".into());
     }
 
@@ -209,6 +217,23 @@ fn cmd_write(id: &str, op_name: &str) -> Result<String, String> {
             "enable" => bootkeeper_core::WriteOp::Enable {
                 item_id: id.to_string(),
             },
+            "remove" => bootkeeper_core::WriteOp::Remove {
+                item_id: id.to_string(),
+            },
+            "restore" => {
+                let snap_id = restore_snapshot_id
+                    .ok_or_else(|| "restore requires --snapshot-id".to_string())?;
+                let store = bootkeeper_core::SnapshotStore::new(snapshot_dir());
+                let snap = store.get(snap_id).map_err(|e| e.to_string())?;
+                let entry = snap
+                    .entries
+                    .iter()
+                    .find(|e| e.item_id == id)
+                    .ok_or_else(|| format!("item {id} not in snapshot {snap_id}"))?
+                    .clone();
+                // restore 走独立路径：直接调 helper 传 snapshot entry
+                return cmd_restore(entry, snap_id);
+            }
             _ => return Err(format!("unknown write op: {op_name}")),
         };
         let request = json!({
@@ -294,6 +319,54 @@ fn launch_helper_elevated(
         std::thread::sleep(std::time::Duration::from_millis(300));
     }
     Ok(())
+}
+
+/// Restore chain: build a request with the snapshot entry, launch helper.
+fn cmd_restore(entry: bootkeeper_core::SnapshotEntry, snap_id: &str) -> Result<String, String> {
+    #[cfg(not(windows))]
+    {
+        let _ = (entry, snap_id);
+        return Err("restore is Windows-only (bootkeeper-helper)".into());
+    }
+
+    #[cfg(windows)]
+    {
+        let dir = data_root().join("tmp");
+        std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+        let req_path = dir.join(format!("restore-{}.json", std::process::id()));
+        let res_path = dir.join(format!("result-{}.json", std::process::id()));
+
+        let request = json!({
+            "restore": entry,
+            "snapshot_id": snap_id,
+            "snapshot_dir": snapshot_dir().to_string_lossy(),
+        });
+        std::fs::write(
+            &req_path,
+            serde_json::to_vec_pretty(&request).map_err(|e| e.to_string())?,
+        )
+        .map_err(|e| e.to_string())?;
+
+        launch_helper_elevated(&req_path, &res_path)?;
+
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(120);
+        loop {
+            if res_path.exists() {
+                break;
+            }
+            if std::time::Instant::now() > deadline {
+                return Err("timed out waiting for helper".into());
+            }
+            std::thread::sleep(std::time::Duration::from_millis(300));
+        }
+
+        let bytes = std::fs::read(&res_path).map_err(|e| e.to_string())?;
+        let _ = std::fs::remove_file(&req_path);
+        let _ = std::fs::remove_file(&res_path);
+        let result: bootkeeper_core::WriteResult =
+            serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
+        serde_json::to_string_pretty(&result).map_err(|e| e.to_string())
+    }
 }
 
 fn cmd_snapshot(action: SnapshotAction) -> Result<String, String> {

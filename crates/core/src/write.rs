@@ -23,6 +23,11 @@ pub enum WriteOp {
         #[serde(default)]
         location: String,
     },
+    /// Restore an item from a snapshot.
+    Restore {
+        snapshot_id: String,
+        item_id: String,
+    },
 }
 
 /// Result of a mutation: what happened + snapshot for undo.

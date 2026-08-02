@@ -19,7 +19,12 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Request {
-    operation: bootkeeper_core::WriteOp,
+    #[serde(default)]
+    operation: Option<bootkeeper_core::WriteOp>,
+    #[serde(default)]
+    restore: Option<bootkeeper_core::SnapshotEntry>,
+    #[serde(default)]
+    snapshot_id: Option<String>,
     #[serde(default = "default_snapshot_dir")]
     snapshot_dir: String,
 }
@@ -76,7 +81,7 @@ fn main() {
 #[cfg(windows)]
 fn run(req_path: &str, res_path: &str) -> Result<(), String> {
     use bootkeeper_core::snapshot::SnapshotStore;
-    use bootkeeper_core::windows::{disable, enable};
+    use bootkeeper_core::windows::{disable, enable, remove};
     use bootkeeper_core::WriteOp;
 
     let req: Request = serde_json::from_slice(
@@ -84,14 +89,40 @@ fn run(req_path: &str, res_path: &str) -> Result<(), String> {
     )
     .map_err(|e| format!("parse request: {e}"))?;
 
+    // Restore requests carry a snapshot entry, not an operation.
+    if let Some(entry) = &req.restore {
+        let op = bootkeeper_core::WriteOp::Restore {
+            snapshot_id: req.snapshot_id.clone().unwrap_or_default(),
+            item_id: entry.item_id.clone(),
+        };
+        let confirmed = confirm_dialog(&op, &restore_facts(entry));
+        if !confirmed {
+            let res = bootkeeper_core::WriteResult {
+                ok: false,
+                message: "cancelled by user".into(),
+                snapshot_entry: None,
+            };
+            write_result(res_path, &res)?;
+            return Ok(());
+        }
+        let result = bootkeeper_core::windows::restore(entry).map_err(|e| e.to_string())?;
+        write_result(res_path, &result)?;
+        return Ok(());
+    }
+
+    let operation = req
+        .operation
+        .clone()
+        .ok_or_else(|| "request has neither operation nor restore".to_string())?;
+
     // 1. Verify facts independently for Disable/Enable/Remove.
-    let facts = match &req.operation {
+    let facts = match &operation {
         WriteOp::Disable { item_id }
         | WriteOp::Enable { item_id }
         | WriteOp::Remove { item_id } => {
             verify_item_facts(item_id).ok_or_else(|| format!("item not found: {item_id}"))?
         }
-        WriteOp::Add { .. } => VerifiedFacts {
+        WriteOp::Add { .. } | WriteOp::Restore { .. } => VerifiedFacts {
             item_id: String::new(),
             name: String::new(),
             command: String::new(),
@@ -104,7 +135,7 @@ fn run(req_path: &str, res_path: &str) -> Result<(), String> {
     };
 
     // 2. Show confirmation dialog with the verified facts.
-    if !confirm_dialog(&req.operation, &facts) {
+    if !confirm_dialog(&operation, &facts) {
         let res = bootkeeper_core::WriteResult {
             ok: false,
             message: "cancelled by user".into(),
@@ -115,12 +146,17 @@ fn run(req_path: &str, res_path: &str) -> Result<(), String> {
     }
 
     // 3. Execute (only reached after Yes) + snapshot.
-    let mut result = match &req.operation {
+    let mut result = match &operation {
         WriteOp::Disable { item_id } => disable(item_id),
         WriteOp::Enable { item_id } => enable(item_id),
-        WriteOp::Remove { .. } | WriteOp::Add { .. } => Err(
-            bootkeeper_core::Error::Msg("remove/add not implemented in this milestone".into()),
-        ),
+        WriteOp::Remove { item_id } => remove(item_id),
+        WriteOp::Add { .. } => Err(bootkeeper_core::Error::Msg(
+            "add not implemented in this milestone".into(),
+        )),
+        // Restore is handled in its own branch above; unreachable here.
+        WriteOp::Restore { .. } => Err(bootkeeper_core::Error::Msg(
+            "restore handled separately".into(),
+        )),
     }
     .map_err(|e| e.to_string())?;
 
@@ -155,6 +191,20 @@ fn verify_item_facts(item_id: &str) -> Option<VerifiedFacts> {
     })
 }
 
+/// Facts for a restore confirmation.
+fn restore_facts(entry: &bootkeeper_core::SnapshotEntry) -> VerifiedFacts {
+    VerifiedFacts {
+        item_id: entry.item_id.clone(),
+        name: entry.original_name.clone(),
+        command: entry.command.clone(),
+        location: entry.location.clone(),
+        category: entry.category.as_str().to_string(),
+        signature: String::new(),
+        risk: String::new(),
+        reasons: vec!["restore from snapshot".into()],
+    }
+}
+
 /// Native confirmation dialog (MessageBoxW). Title says what will happen;
 /// body shows machine-verified facts only.
 #[cfg(windows)]
@@ -176,6 +226,9 @@ fn confirm_dialog(op: &bootkeeper_core::WriteOp, facts: &VerifiedFacts) -> bool 
         }
         bootkeeper_core::WriteOp::Add { .. } => {
             ("BootKeeper — Add startup item", "Add")
+        }
+        bootkeeper_core::WriteOp::Restore { .. } => {
+            ("BootKeeper — Restore startup item", "Restore")
         }
     };
 
@@ -221,15 +274,17 @@ mod tests {
     #[test]
     fn request_roundtrips() {
         let req = Request {
-            operation: bootkeeper_core::WriteOp::Disable {
+            operation: Some(bootkeeper_core::WriteOp::Disable {
                 item_id: "registry_run:HKCU\\...\\Run:Foo".into(),
-            },
+            }),
+            restore: None,
+            snapshot_id: None,
             snapshot_dir: ".".into(),
         };
         let json = serde_json::to_string(&req).unwrap();
         let back: Request = serde_json::from_str(&json).unwrap();
         match back.operation {
-            bootkeeper_core::WriteOp::Disable { item_id } => {
+            Some(bootkeeper_core::WriteOp::Disable { item_id }) => {
                 assert!(item_id.contains("Foo"))
             }
             _ => panic!("wrong variant"),
