@@ -8,7 +8,7 @@ Windows 自启动管理工具：开源、现代 UI（Material Design 3）、中�
 
 - **差异化**：现代 UI + i18n + AI 交互，不是"管理启动项"本身。
 - **对标缺口**：Sysinternals Autoruns 界面过时且无中文；CCleaner 收费；其他开源 Startup Manager 无 AI 交互。
-- **形态**：开源免费（MIT），Windows 桌面应用。
+- **形态**：开源免费（GPL-3.0），Windows 桌面应用。
 
 ## v1 范围（三件套）
 
