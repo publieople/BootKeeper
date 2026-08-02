@@ -28,6 +28,15 @@ Tauri 2 (Rust) + Vue 3 + TypeScript + Naive UI
 + Pinia + vue-i18n + tauri-plugin-locale-api + Vite
 ```
 
+### 核心依赖（已调研定稿）
+
+| 能力 | 方案 | 依据 |
+|---|---|---|
+| 注册表 | `winreg` v0.56 | 196M 下载，活跃 |
+| 任务计划 | `windows` crate `Win32_System_TaskScheduler` (COM) | `taskschd` crate 已死；schtasks CLI 输出本地化脆弱 |
+| 签名校验 | `windows` crate `Win32_Security_WinTrust` (WinVerifyTrust) | 官方绑定，只验有效性 |
+| i18n | 中/英（v1），vue-i18n 扩展方便 | 后续按需加语言 |
+
 参考项目：[motrix-next](https://github.com/AnInsomniacy/motrix-next)（Tauri 2 + Vue 3 + Naive UI + MD3 取色 + 52 语言 i18n + sidecar 模式）。
 
 ## 架构：三进程
@@ -52,7 +61,34 @@ Tauri 2 (Rust) + Vue 3 + TypeScript + Naive UI
 - 禁用语义 = **改名**（`Foo` → `Foo.disabled`，Autoruns 官方思路）；恢复 = 改回名字。
 - MCP tool surface 含 `restore_item`。
 
-## MCP tool surface（草案）
+## AI 交互：CLI 为底座，Skill 先行，MCP 可后置
+
+**目标**：任何 AI agent 都能调用。Skill 不是跨 agent 标准（Claude/Hermes/OpenCode 格式各异），CLI 才是通用底座。
+
+```
+AI agent → 读 SKILL.md/skill → 调 bootkeeper CLI → core crate
+协议系 agent → 连 MCP (后续) → 调 bootkeeper CLI
+```
+
+- **v1**：`bootkeeper` CLI + `SKILL.md`（说明书，教 agent 调 CLI）
+- **MCP 后置**：包一层 CLI → MCP 工具，不动 core
+
+## CLI 命令面（v1）
+
+| 命令 | 读/写 | 说明 |
+|---|---|---|
+| `bootkeeper list [--category]` | 读 | 枚举启动项，按类别过滤 |
+| `bootkeeper get <id>` | 读 | 单条详情（路径/签名/发布者/风险等级） |
+| `bootkeeper analyze [--category]` | 读 | AI 辅助分析输出（JSON，含规则定级） |
+| `bootkeeper enable <id>` / `disable <id>` | 写* | 改回/追加 `.disabled` 后缀 |
+| `bootkeeper remove <id>` | 写* | 删除条目（先备份） |
+| `bootkeeper add <category> <name> <command>` | 写* | 新增条目 |
+| `bootkeeper restore <snapshot-id>` | 写* | 从快照恢复 |
+| `bootkeeper snapshot list` | 读 | 查看快照历史 |
+
+*写命令必须持有有效确认 token（helper 弹窗通过后颁发）才执行。
+
+## MCP tool surface（后置草案）
 
 | 工具 | 读/写 | 说明 |
 |---|---|---|
@@ -69,20 +105,22 @@ Tauri 2 (Rust) + Vue 3 + TypeScript + Naive UI
 
 ## 待定问题（写代码前逐一定）
 
-- [ ] Rust workspace 划分（core / mcp-server / helper / gui）
-- [ ] MCP server 实现 crate（rmcp 或 tauri 侧自实现）
-- [ ] token 存储（Windows Credential Manager / DPAPI vs 配置文件）
-- [ ] i18n 规模（52 语言 or v1 只做 zh/en）
-- [ ] 签名校验信任锚（微软证书列表怎么维护）
-- [ ] 任务计划实现（COM API vs schtasks CLI 包装）
+- [x] Rust workspace 划分（core / cli / helper / app）
+- [x] 核心枚举实现（winreg + windows crate COM）
+- [x] 签名校验（WinVerifyTrust，只验有效性）
+- [x] i18n 规模（中/英，v1）
+- [ ] CLI 参数与 JSON 输出格式细节（M1）
+- [ ] token 存储（Windows Credential Manager / DPAPI vs 配置文件）（M1）
+- [ ] SKILL.md 编写与 agent 兼容性验证（M1）
+- [ ] MCP 适配层（后置，包 CLI）
 
 ## 里程碑
 
 - **M0**：workspace 骨架 + core（枚举三件套 + 规则引擎 + 快照）
-- **M1**：sidecar（MCP server + token + HTTP）跑通读链路
-- **M2**：helper（提权 + 独立确认窗 + 写操作 + 硬确认 token）
-- **M3**：GUI（Naive UI + MD3 + i18n 骨架）
-- **M4**：AI 全链路联调 + 快照恢复 + 打包发布
+- **M1**：CLI 跑通读链路（list/get/analyze/snapshot）+ SKILL.md
+- **M2**：helper（提权 + 独立确认窗 + 写操作 + 硬确认 token）+ CLI 写命令
+- **M3**：GUI（Naive UI + MD3 + 中英 i18n）
+- **M4**：AI 全链路联调 + 快照恢复 + 打包发布 + MCP 适配层
 
 ## 参考
 
