@@ -71,6 +71,7 @@ AI agent → 读 SKILL.md/skill → 调 bootkeeper CLI → core crate
 ```
 
 - **v1**：`bootkeeper` CLI + `SKILL.md`（说明书，教 agent 调 CLI）
+- **SKILL.md 标准**：采用 skills.sh（Vercel Agent Skills 生态，vercel-labs/skills）——标准 SKILL.md 格式，`npx skills add publieople/BootKeeper` 安装，覆盖 19+ agent（含 nous-research/Hermes、Claude Code、Cursor、Codex、Gemini 等）
 - **MCP 后置**：包一层 CLI → MCP 工具，不动 core
 
 ## CLI 命令面（v1）
@@ -127,3 +128,4 @@ AI agent → 读 SKILL.md/skill → 调 bootkeeper CLI → core crate
 - 功能清单：https://github.com/p0w3rsh3ll/AutoRuns
 - 技术参考：https://github.com/AnInsomniacy/motrix-next
 - 内置 MCP 应用先例：https://github.com/Env-Kit/envkit-releases
+- Skill 标准：https://skills.sh（vercel-labs/skills，`npx skills add`）
