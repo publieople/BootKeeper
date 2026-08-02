@@ -119,7 +119,7 @@ AI agent → 读 SKILL.md/skill → 调 bootkeeper CLI → core crate
 
 - **M0**：workspace 骨架 + core（枚举三件套 + 规则引擎 + 快照）
 - **M1**：CLI 跑通读链路（list/get/analyze/snapshot）+ SKILL.md ✅
-- **M2**：helper（提权 + 独立确认窗 + 写操作 + 硬确认 token）+ CLI 写命令
+- **M2**：helper（提权 + 独立确认窗 + 写操作 + 硬确认 token）+ CLI 写命令 ✅
 - **M3**：GUI（Naive UI + MD3 + 中英 i18n）
 - **M4**：AI 全链路联调 + 快照恢复 + 打包发布 + MCP 适配层
 
