@@ -26,3 +26,25 @@ jobs:
       - run: cargo test --workspace
       # Windows 模块编译检查（含 clippy，零警告门禁）
       - run: cargo clippy --workspace --all-targets -- -D warnings
+
+  # GUI：前端构建 + Rust 检查（Windows 真机）
+  gui:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: gui
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: gui/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: cargo check
+        working-directory: gui/src-tauri

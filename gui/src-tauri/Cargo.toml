@@ -1,0 +1,39 @@
+[package]
+name = "bootkeeper-gui"
+version = "0.1.0"
+description = "BootKeeper GUI"
+edition = "2021"
+license = "GPL-3.0"
+repository = "https://github.com/publieople/BootKeeper"
+
+[lib]
+name = "bootkeeper_gui_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+bootkeeper-core = { path = "../../crates/core" }
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = [
+    "Win32_System_TaskScheduler",
+    "Win32_System_Com",
+    "Win32_System_Variant",
+    "Win32_System_Ole",
+    "Win32_Security_WinTrust",
+    "Win32_Security_Cryptography",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_System_Threading",
+    "Win32_Foundation",
+] }
+
+# Independent workspace: do NOT join the root BootKeeper workspace
+# (separate tauri-build dependency tree).
+[workspace]
