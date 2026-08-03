@@ -1,0 +1,23 @@
+[package]
+name = "bootkeeper-mcp"
+description = "BootKeeper MCP server: expose bootkeeper CLI tools to protocol-standard agents"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "bootkeeper-mcp"
+path = "src/main.rs"
+
+[dependencies]
+bootkeeper-core = { path = "../core" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+schemars = { version = "1.0", features = ["derive"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+rmcp = { version = "3.1", features = ["server", "transport-io", "macros"] }
+
+[target.'cfg(windows)'.dependencies]
+windows.workspace = true
