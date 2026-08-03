@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, h } from 'vue'
-import { NButton, NDataTable, NTag, NSpace, NEmpty } from 'naive-ui'
-import { Refresh } from '@vicons/ionicons5'
+import {
+  NButton, NDataTable, NTag, NSpace, NEmpty, NModal, NForm, NFormItem,
+  NInput, NSelect, NRadioGroup, NRadio,
+} from 'naive-ui'
+import { Refresh, Add as AddIcon } from '@vicons/ionicons5'
 import { useI18n } from 'vue-i18n'
-import type { DataTableColumns } from 'naive-ui'
+import type { DataTableColumns, FormInst, FormRules } from 'naive-ui'
 import { invoke } from '@tauri-apps/api/core'
 
 interface StartupItem {
@@ -30,6 +33,21 @@ const snapshots = ref<SnapshotMeta[]>([])
 const loading = ref(true)
 const currentTab = ref<'all' | 'registry_run' | 'startup_folder' | 'scheduled_task' | 'snapshots'>('all')
 const { t } = useI18n()
+
+// Add-entry dialog state
+const showAdd = ref(false)
+const addForm = ref({
+  category: 'registry_run' as 'registry_run' | 'startup_folder',
+  name: '',
+  command: '',
+  location: 'HKCU\\...\\Run',
+})
+const addFormRef = ref<FormInst | null>(null)
+
+const addRules: FormRules = {
+  name: { required: true, message: 'name required', trigger: ['input', 'blur'] },
+  command: { required: true, message: 'command required', trigger: ['input', 'blur'] },
+}
 
 async function fetchItems() {
   loading.value = true
@@ -91,13 +109,35 @@ async function doAction(action: 'enable' | 'disable' | 'remove', item: StartupIt
   }
 }
 
+async function submitAdd() {
+  try {
+    await addFormRef.value?.validate()
+  } catch {
+    return
+  }
+  try {
+    await invoke('add_item', {
+      category: addForm.value.category,
+      name: addForm.value.name,
+      command: addForm.value.command,
+      location: addForm.value.category === 'startup_folder' ? 'user_startup' : addForm.value.location,
+    })
+    showAdd.value = false
+    addForm.value.name = ''
+    addForm.value.command = ''
+    await fetchItems()
+    await fetchSnapshots()
+  } catch (e) {
+    console.error('add failed:', e)
+  }
+}
+
 // Restore the first entry of a snapshot (v1: single-entry snapshots).
 async function restoreSnapshot(snap: SnapshotMeta) {
   try {
-    // The snapshot's first entry carries item_id; restore it.
     const detail = await invoke<any>('restore_item', {
       snapshotId: snap.id,
-      itemId: '', // resolved server-side to first entry if empty
+      itemId: '',
     })
     console.log('restore result:', detail)
     await fetchItems()
@@ -174,6 +214,10 @@ const snapshotColumns: DataTableColumns<SnapshotMeta> = [
         <p class="subtitle">{{ t('app.subtitle') }}</p>
       </div>
       <NSpace>
+        <NButton size="small" type="primary" @click="showAdd = true">
+          <template #icon><AddIcon /></template>
+          {{ t('action.add') }}
+        </NButton>
         <NButton size="small" @click="fetchItems" :loading="loading">
           <template #icon><Refresh /></template>
           {{ t('action.refresh') }}
@@ -218,6 +262,41 @@ const snapshotColumns: DataTableColumns<SnapshotMeta> = [
         </template>
       </NDataTable>
     </main>
+
+    <NModal v-model:show="showAdd" preset="card" :title="t('action.add')" style="width: 480px">
+      <NForm ref="addFormRef" :model="addForm" :rules="addRules" label-placement="top">
+        <NFormItem :label="t('table.category')" path="category">
+          <NRadioGroup v-model:value="addForm.category">
+            <NRadio value="registry_run">{{ t('nav.registry') }}</NRadio>
+            <NRadio value="startup_folder">{{ t('nav.folder') }}</NRadio>
+          </NRadioGroup>
+        </NFormItem>
+        <NFormItem :label="t('table.name')" path="name">
+          <NInput v-model:value="addForm.name" placeholder="MyApp" />
+        </NFormItem>
+        <NFormItem
+          :label="addForm.category === 'registry_run' ? t('table.command') : t('add.source_file')"
+          path="command"
+        >
+          <NInput v-model:value="addForm.command" placeholder="C:\Path\to\app.exe" />
+        </NFormItem>
+        <NFormItem v-if="addForm.category === 'registry_run'" :label="t('table.location')" path="location">
+          <NSelect
+            v-model:value="addForm.location"
+            :options="[
+              { label: 'HKCU\\...\\Run', value: 'HKCU\\...\\Run' },
+              { label: 'HKLM\\...\\Run', value: 'HKLM\\...\\Run' },
+            ]"
+          />
+        </NFormItem>
+      </NForm>
+      <template #footer>
+        <NSpace justify="end">
+          <NButton @click="showAdd = false">{{ t('action.cancel') }}</NButton>
+          <NButton type="primary" @click="submitAdd">{{ t('action.add') }}</NButton>
+        </NSpace>
+      </template>
+    </NModal>
   </div>
 </template>
 

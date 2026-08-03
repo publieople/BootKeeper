@@ -17,7 +17,7 @@ pub mod startup_folder;
 
 pub use launcher::{run_helper, run_helper_with_snapshot_dir, snapshot_dir, tmp_dir};
 #[cfg(windows)]
-pub use ops::{disable, enable, remove, restore};
+pub use ops::{add, disable, enable, remove, restore};
 #[cfg(windows)]
 pub use registry::enumerate_registry_run;
 #[cfg(windows)]

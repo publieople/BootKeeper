@@ -16,18 +16,22 @@ pub enum WriteOp {
     /// Remove entry entirely (after snapshot backup).
     Remove { item_id: String },
     /// Add a new entry.
-    Add {
-        category: Category,
-        name: String,
-        command: String,
-        #[serde(default)]
-        location: String,
-    },
+    Add(WriteOpAdd),
     /// Restore an item from a snapshot.
     Restore {
         snapshot_id: String,
         item_id: String,
     },
+}
+
+/// Parameters for adding a startup entry.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct WriteOpAdd {
+    pub category: Category,
+    pub name: String,
+    pub command: String,
+    #[serde(default)]
+    pub location: String,
 }
 
 /// Result of a mutation: what happened + snapshot for undo.

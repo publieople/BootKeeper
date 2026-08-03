@@ -48,6 +48,30 @@ async fn run_write_action(action: String, id: String) -> Result<serde_json::Valu
     serde_json::to_value(&result).map_err(|e| e.to_string())
 }
 
+/// Add a startup entry (registry or startup folder). Elevation + confirm.
+#[tauri::command]
+async fn add_item(
+    category: String,
+    name: String,
+    command: String,
+    location: Option<String>,
+) -> Result<serde_json::Value, String> {
+    let cat = match category.as_str() {
+        "registry_run" => bootkeeper_core::Category::RegistryRun,
+        "startup_folder" => bootkeeper_core::Category::StartupFolder,
+        "scheduled_task" => bootkeeper_core::Category::ScheduledTask,
+        other => return Err(format!("unknown category: {other}")),
+    };
+    let op = bootkeeper_core::WriteOp::Add(bootkeeper_core::WriteOpAdd {
+        category: cat,
+        name,
+        command,
+        location: location.unwrap_or_else(|| "HKCU\\...\\Run".into()),
+    });
+    let result = launcher::run_helper(op).map_err(|e| e.to_string())?;
+    serde_json::to_value(&result).map_err(|e| e.to_string())
+}
+
 /// Restore an item from a snapshot entry.
 #[tauri::command]
 async fn restore_item(snapshot_id: String, item_id: String) -> Result<serde_json::Value, String> {
@@ -99,6 +123,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             list_items,
             run_write_action,
+            add_item,
             restore_item,
             list_snapshots
         ])

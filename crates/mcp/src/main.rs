@@ -51,6 +51,23 @@ pub struct IdParam {
 }
 
 #[derive(Serialize, Deserialize, JsonSchema)]
+pub struct AddParam {
+    /// registry_run | startup_folder (scheduled_task not supported in v1)
+    pub category: String,
+    /// Entry name (value name / filename)
+    pub name: String,
+    /// Command (registry) or source file path (startup folder)
+    pub command: String,
+    /// For registry_run: HKCU\...\Run or HKLM\...\Run. Default HKCU\...\Run.
+    #[serde(default = "default_location")]
+    pub location: String,
+}
+
+fn default_location() -> String {
+    "HKCU\\...\\Run".into()
+}
+
+#[derive(Serialize, Deserialize, JsonSchema)]
 pub struct RestoreParam {
     /// Snapshot id, from list_snapshots output.
     pub snapshot_id: String,
@@ -155,6 +172,12 @@ impl BootKeeperServer {
         run_write(bootkeeper_core::WriteOp::Remove { item_id: p.0.id }).await
     }
 
+    /// Add a startup entry (registry or startup folder). Shows a confirmation dialog.
+    #[tool(name = "add_item", description = "Add a new startup entry (registry Run value or startup folder file). Launches an elevated helper with a UAC + confirmation dialog; the user MUST approve.")]
+    pub async fn add_item(&self, p: Parameters<AddParam>) -> String {
+        run_add(p.0).await
+    }
+
     /// List snapshots (undo history, kept 7 days).
     #[tool(name = "list_snapshots", description = "List snapshot metadata (id, time, operation, entry count) for undo history.")]
     pub async fn list_snapshots(&self) -> String {
@@ -212,6 +235,23 @@ impl BootKeeperServer {
             "{\"error\":\"restore requires Windows\"}".into()
         }
     }
+}
+
+/// Shared add path through the elevated helper.
+async fn run_add(p: AddParam) -> String {
+    let cat = match p.category.as_str() {
+        "registry_run" => bootkeeper_core::Category::RegistryRun,
+        "startup_folder" => bootkeeper_core::Category::StartupFolder,
+        "scheduled_task" => bootkeeper_core::Category::ScheduledTask,
+        other => return format!("{{\"error\":\"unknown category: {other}\"}}"),
+    };
+    let op = bootkeeper_core::WriteOp::Add(bootkeeper_core::WriteOpAdd {
+        category: cat,
+        name: p.name,
+        command: p.command,
+        location: p.location,
+    });
+    run_write(op).await
 }
 
 /// Shared write path through the elevated helper.

@@ -122,7 +122,17 @@ fn run(req_path: &str, res_path: &str) -> Result<(), String> {
         | WriteOp::Remove { item_id } => {
             verify_item_facts(item_id).ok_or_else(|| format!("item not found: {item_id}"))?
         }
-        WriteOp::Add { .. } | WriteOp::Restore { .. } => VerifiedFacts {
+        WriteOp::Add(add) => VerifiedFacts {
+            item_id: format!("{:?}", add.category).to_lowercase(),
+            name: add.name.clone(),
+            command: add.command.clone(),
+            location: add.location.clone(),
+            category: add.category.as_str().to_string(),
+            signature: String::new(),
+            risk: String::new(),
+            reasons: vec!["add new entry".into()],
+        },
+        WriteOp::Restore { .. } => VerifiedFacts {
             item_id: String::new(),
             name: String::new(),
             command: String::new(),
@@ -150,9 +160,7 @@ fn run(req_path: &str, res_path: &str) -> Result<(), String> {
         WriteOp::Disable { item_id } => disable(item_id),
         WriteOp::Enable { item_id } => enable(item_id),
         WriteOp::Remove { item_id } => remove(item_id),
-        WriteOp::Add { .. } => Err(bootkeeper_core::Error::Msg(
-            "add not implemented in this milestone".into(),
-        )),
+        WriteOp::Add(add) => bootkeeper_core::windows::add(add),
         // Restore is handled in its own branch above; unreachable here.
         WriteOp::Restore { .. } => Err(bootkeeper_core::Error::Msg(
             "restore handled separately".into(),

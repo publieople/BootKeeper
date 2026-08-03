@@ -42,6 +42,16 @@ enum Commands {
     Remove { id: String },
     /// Restore an item from a snapshot. Requires elevation + confirmation.
     Restore { snapshot_id: String, item_id: String },
+    /// Add a startup entry. Requires elevation + confirmation.
+    Add {
+        /// registry_run | startup_folder
+        category: String,
+        name: String,
+        command: String,
+        /// For registry_run: HKCU\...\Run or HKLM\...\Run. For startup_folder: user_startup.
+        #[arg(long, default_value = "HKCU\\...\\Run")]
+        location: String,
+    },
     /// Snapshot store operations.
     Snapshot {
         #[command(subcommand)]
@@ -68,6 +78,9 @@ fn main() {
         Commands::Remove { id } => cmd_write(&id, "remove", None),
         Commands::Restore { snapshot_id, item_id } => {
             cmd_write(&item_id, "restore", Some(&snapshot_id))
+        }
+        Commands::Add { category, name, command, location } => {
+            cmd_add(&category, &name, &command, &location)
         }
         Commands::Snapshot { action } => cmd_snapshot(action),
     };
@@ -250,6 +263,32 @@ fn cmd_restore(entry: bootkeeper_core::SnapshotEntry, snap_id: &str) -> Result<S
     {
         let _ = (entry, snap_id);
         Err("restore is Windows-only (bootkeeper-helper)".into())
+    }
+}
+
+/// Add chain: build WriteOp::Add, run through helper.
+fn cmd_add(category: &str, name: &str, command: &str, location: &str) -> Result<String, String> {
+    let cat = match category {
+        "registry_run" => bootkeeper_core::Category::RegistryRun,
+        "startup_folder" => bootkeeper_core::Category::StartupFolder,
+        "scheduled_task" => bootkeeper_core::Category::ScheduledTask,
+        _ => return Err(format!("unknown category: {category}")),
+    };
+    let op = bootkeeper_core::WriteOp::Add(bootkeeper_core::WriteOpAdd {
+        category: cat,
+        name: name.to_string(),
+        command: command.to_string(),
+        location: location.to_string(),
+    });
+    #[cfg(windows)]
+    {
+        let result = bootkeeper_core::windows::run_helper(op).map_err(|e| e.to_string())?;
+        serde_json::to_string_pretty(&result).map_err(|e| e.to_string())
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = op;
+        Err("write commands are Windows-only (bootkeeper-helper)".into())
     }
 }
 

@@ -441,3 +441,65 @@ mod restore_tests {
         assert_eq!(task_parent_folder("\\Foo"), "\\");
     }
 }
+
+/// Add a startup entry.
+///
+/// - RegistryRun: write a REG_SZ value under the Run key.
+/// - StartupFolder: copy the target file into the startup folder.
+/// - ScheduledTask: v1 not supported (task creation via COM is heavy; the
+///   CLI/GUI surface exposes Add only for registry and folder).
+#[cfg(windows)]
+pub fn add(op: &crate::write::WriteOpAdd) -> Result<WriteResult, Error> {
+    match op.category {
+        Category::RegistryRun => add_registry(op),
+        Category::StartupFolder => add_file(op),
+        Category::ScheduledTask => Err(Error::Msg(
+            "adding scheduled tasks is not implemented in v1".into(),
+        )),
+    }
+}
+
+#[cfg(windows)]
+fn add_registry(op: &crate::write::WriteOpAdd) -> Result<WriteResult, Error> {
+    use winreg::enums::{KEY_READ, KEY_WRITE, REG_SZ};
+    use winreg::RegValue;
+
+    let (hive, rest) = parse_hive_and_key(&op.location)?;
+    let key = hive.open_subkey_with_flags(rest, KEY_READ | KEY_WRITE)?;
+
+    key.set_raw_value(
+        &op.name,
+        &RegValue {
+            bytes: std::borrow::Cow::Owned(
+                op.command
+                    .encode_utf16()
+                    .flat_map(|u| u.to_le_bytes())
+                    .collect(),
+            ),
+            vtype: REG_SZ,
+        },
+    )?;
+
+    Ok(WriteResult {
+        ok: true,
+        message: format!("added {} to {}", op.name, op.location),
+        snapshot_entry: None,
+    })
+}
+
+#[cfg(windows)]
+fn add_file(op: &crate::write::WriteOpAdd) -> Result<WriteResult, Error> {
+    let dir = crate::windows::startup_folder::startup_folder_path(&op.location)
+        .ok_or_else(|| Error::Msg(format!("cannot resolve startup folder: {}", op.location)))?;
+    let src = std::path::Path::new(&op.command);
+    if !src.exists() {
+        return Err(Error::Msg(format!("source file not found: {}", op.command)));
+    }
+    let target = std::path::Path::new(&dir).join(&op.name);
+    std::fs::copy(src, &target)?;
+    Ok(WriteResult {
+        ok: true,
+        message: format!("added {} to {}", op.name, op.location),
+        snapshot_entry: None,
+    })
+}
