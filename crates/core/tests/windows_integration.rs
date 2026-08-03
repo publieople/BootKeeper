@@ -15,9 +15,12 @@ use winreg::{RegKey, RegValue};
 #[test]
 fn disable_rename_roundtrip_on_real_registry() {
     const TEST_NAME: &str = "BootKeeperCITest";
-    let run_key = RegKey::predef(HKEY_CURRENT_USER)
-        .open_subkey_with_flags("Software\\Microsoft\\Windows\\CurrentVersion\\Run", KEY_READ | KEY_WRITE)
-        .expect("open HKCU Run");
+    // CI runners may not have HKCU\...\Run yet — create it (no-op if present).
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+    let run_key = hkcu
+        .create_subkey("Software\\Microsoft\\Windows\\CurrentVersion\\Run")
+        .expect("create HKCU Run")
+        .0;
 
     // 1. Write a test value (UTF-16LE REG_SZ with a unicode path to catch
     //    encoding regressions too).
