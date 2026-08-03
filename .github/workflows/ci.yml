@@ -46,5 +46,9 @@ jobs:
           cache-dependency-path: gui/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+      # 先构建 CLI + helper 并准备 bundle resources（tauri.conf 引用它们）
+      - run: cargo build --release -p bootkeeper-cli -p bootkeeper-helper
+        working-directory: .
+      - run: node scripts/prepare-resources.mjs
       - run: cargo check
         working-directory: gui/src-tauri
