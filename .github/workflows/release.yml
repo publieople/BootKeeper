@@ -28,19 +28,13 @@ jobs:
       - run: pnpm install --frozen-lockfile
       # tauri.conf beforeBuildCommand builds CLI+helper and prepares resources
       - run: pnpm tauri build
-      # Upload both the installer and the raw bundles
-      - name: Upload installer (NSIS)
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: bootkeeper-installer
           path: |
             gui/src-tauri/target/release/bundle/nsis/*.exe
             gui/src-tauri/target/release/bundle/msi/*.msi
-      - name: Upload portable binary
-        uses: actions/upload-artifact@v4
-        with:
-          name: bootkeeper-portable
-          path: gui/src-tauri/target/release/bundle/nsis/*.exe
 
   publish:
     needs: build-windows
@@ -48,14 +42,16 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          path: artifacts
+          name: bootkeeper-installer
+          path: installer
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
           TAG="${{ github.ref_name }}"
+          ls -la installer/
           gh release create "$TAG" \
-            artifacts/*/*.exe artifacts/*/*.msi \
+            installer/*.exe installer/*.msi \
             --title "BootKeeper $TAG" \
-            --notes "BootKeeper $TAG release — Windows installer + portable binary." || true
+            --notes "BootKeeper $TAG release — Windows installer (NSIS) + MSI."
