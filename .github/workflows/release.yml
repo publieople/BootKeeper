@@ -32,9 +32,11 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: bootkeeper-installer
+          # flatten: upload from within the bundle dirs so download is flat
           path: |
             gui/src-tauri/target/release/bundle/nsis/*.exe
             gui/src-tauri/target/release/bundle/msi/*.msi
+          if-no-files-found: error
 
   publish:
     needs: build-windows
@@ -44,14 +46,17 @@ jobs:
         with:
           name: bootkeeper-installer
           path: installer
+      - name: List downloaded files
+        run: find installer -type f
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
           TAG="${{ github.ref_name }}"
-          ls -la installer/
-          gh release create "$TAG" \
-            installer/*.exe installer/*.msi \
+          # Collect every exe/msi anywhere under installer/
+          FILES=$(find installer -type f \( -name "*.exe" -o -name "*.msi" \) | tr '\n' ' ')
+          echo "uploading: $FILES"
+          gh release create "$TAG" $FILES \
             --title "BootKeeper $TAG" \
             --notes "BootKeeper $TAG release — Windows installer (NSIS) + MSI."
