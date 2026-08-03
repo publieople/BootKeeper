@@ -8,8 +8,10 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
 const here = dirname(fileURLToPath(import.meta.url))
+// gui/scripts -> gui/src-tauri/resources (where tauri.conf expects them)
+const outDir = join(here, '..', 'src-tauri', 'resources')
+// gui/scripts -> repo root target/release
 const targetDir = join(here, '..', '..', 'target', 'release')
-const outDir = join(here, 'resources')
 
 mkdirSync(outDir, { recursive: true })
 
@@ -20,7 +22,7 @@ for (const bin of bins) {
   if (existsSync(src)) {
     cpSync(src, join(outDir, bin))
     copied++
-    console.log(`resource: ${bin}`)
+    console.log(`resource: ${bin} -> ${join(outDir, bin)}`)
   } else {
     console.warn(`missing: ${src}`)
   }
