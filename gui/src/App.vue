@@ -305,8 +305,8 @@ const snapshotColumns: DataTableColumns<SnapshotMeta> = [
 html, body, #app { height: 100%; }
 body {
   font-family: -apple-system, 'Segoe UI', 'Microsoft YaHei', sans-serif;
-  background: #f5f5f5;
-  color: #1f1f1f;
+  background: var(--bk-body-bg, #f5f5f5);
+  color: var(--bk-text, #1f1f1f);
 }
 .app { max-width: 1100px; margin: 0 auto; padding: 24px; }
 .app-header {
@@ -314,15 +314,20 @@ body {
   margin-bottom: 16px;
 }
 .app-header h1 { font-size: 24px; }
-.subtitle { color: #666; font-size: 13px; margin-top: 2px; }
+.subtitle { color: var(--bk-text-sub, #666); font-size: 13px; margin-top: 2px; }
 .tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
 .tab {
-  padding: 6px 14px; border: 1px solid #ddd; border-radius: 999px;
-  background: #fff; cursor: pointer; font-size: 13px; color: #555;
-  transition: all .15s;
+  padding: 6px 14px; border: 1px solid var(--bk-border, #ddd); border-radius: 999px;
+  background: var(--bk-card-bg, #fff); cursor: pointer; font-size: 13px;
+  color: var(--bk-text-sub, #555); transition: all .15s;
 }
-.tab:hover { border-color: #18a058; color: #18a058; }
-.tab.active { background: #18a058; border-color: #18a058; color: #fff; }
-main { background: #fff; border-radius: 12px; padding: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
-.retention { padding: 8px 12px; color: #888; font-size: 12px; }
+.tab:hover { border-color: var(--bk-primary, #18a058); color: var(--bk-primary, #18a058); }
+.tab.active {
+  background: var(--bk-primary, #18a058); border-color: var(--bk-primary, #18a058); color: #fff;
+}
+main {
+  background: var(--bk-card-bg, #fff); border-radius: 12px; padding: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.08);
+}
+.retention { padding: 8px 12px; color: var(--bk-text-sub, #888); font-size: 12px; }
 </style>

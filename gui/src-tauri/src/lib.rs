@@ -103,6 +103,25 @@ async fn restore_item(snapshot_id: String, item_id: String) -> Result<serde_json
     }
 }
 
+/// Read the Windows accent color (DWM AccentColor, ABGR) for MD3 theming.
+#[tauri::command]
+fn get_accent_color() -> Option<u32> {
+    #[cfg(windows)]
+    {
+        use winreg::enums::{HKEY_CURRENT_USER, KEY_READ};
+        use winreg::RegKey;
+        let key = "Software\\Microsoft\\Windows\\DWM";
+        match RegKey::predef(HKEY_CURRENT_USER).open_subkey_with_flags(key, KEY_READ) {
+            Ok(k) => k.get_value::<u32, _>("AccentColor").ok(),
+            Err(_) => None,
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        None
+    }
+}
+
 /// List snapshot metadata (id, time, operation, entry count).
 #[tauri::command]
 fn list_snapshots() -> Vec<serde_json::Value> {
@@ -125,7 +144,8 @@ pub fn run() {
             run_write_action,
             add_item,
             restore_item,
-            list_snapshots
+            list_snapshots,
+            get_accent_color
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
