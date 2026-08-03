@@ -6,7 +6,7 @@
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "pnpm build",
+    "beforeBuildCommand": "pnpm build && cargo build --release -p bootkeeper-cli -p bootkeeper-helper && node scripts/prepare-resources.mjs",
     "frontendDist": "../dist"
   },
   "app": {
@@ -30,6 +30,10 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "resources": {
+      "resources/bootkeeper.exe": "bootkeeper.exe",
+      "resources/bootkeeper-helper.exe": "bootkeeper-helper.exe"
+    }
   }
 }

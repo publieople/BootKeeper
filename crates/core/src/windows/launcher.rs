@@ -193,15 +193,36 @@ pub fn helper_path() -> Result<PathBuf, Error> {
     }
     let exe = std::env::current_exe().map_err(|e| Error::Msg(e.to_string()))?;
     let dir = exe.parent().ok_or_else(|| Error::Msg("no exe dir".into()))?;
+
+    // 1. Same directory as the current exe (bundled install).
     let candidate = dir.join("bootkeeper-helper.exe");
     if candidate.exists() {
-        Ok(candidate)
-    } else {
-        Err(Error::Msg(format!(
-            "bootkeeper-helper.exe not found next to {} (set BOOTKEEPER_HELPER to override)",
-            exe.to_string_lossy()
-        )))
+        return Ok(candidate);
     }
+
+    // 2. Dev fallback: walk up to repo root and look in target/{release,debug}
+    //    and src-tauri/target/{release,debug}.
+    let mut cur = exe.clone();
+    for _ in 0..5 {
+        if let Some(parent) = cur.parent() {
+            cur = parent.to_path_buf();
+            for sub in ["target", "src-tauri/target"] {
+                for profile in ["release", "debug"] {
+                    let cand = cur.join(sub).join(profile).join("bootkeeper-helper.exe");
+                    if cand.exists() {
+                        return Ok(cand);
+                    }
+                }
+            }
+        } else {
+            break;
+        }
+    }
+
+    Err(Error::Msg(format!(
+        "bootkeeper-helper.exe not found near {} (set BOOTKEEPER_HELPER to override)",
+        exe.to_string_lossy()
+    )))
 }
 
 #[cfg(test)]
