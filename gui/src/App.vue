@@ -99,12 +99,18 @@ function sigType(sig: StartupItem['signature']) {
   return 'default'
 }
 
+const actionError = ref('')
+
 async function doAction(action: 'enable' | 'disable' | 'remove', item: StartupItem) {
+  actionError.value = ''
   try {
-    await invoke('run_write_action', { action, id: item.id })
+    const res = await invoke<any>('run_write_action', { action, id: item.id })
+    console.log('write result:', res)
     await fetchItems()
     await fetchSnapshots()
   } catch (e) {
+    const msg = typeof e === 'string' ? e : JSON.stringify(e)
+    actionError.value = `${action} ${item.name}: ${msg}`
     console.error('write action failed:', e)
   }
 }
@@ -237,6 +243,7 @@ const snapshotColumns: DataTableColumns<SnapshotMeta> = [
     </nav>
 
     <main>
+      <div v-if="actionError" class="action-error">{{ actionError }}</div>
       <div v-if="currentTab === 'snapshots'">
         <p class="retention">{{ t('snapshot_retention') }}</p>
         <NDataTable
@@ -330,4 +337,9 @@ main {
   box-shadow: 0 1px 3px rgba(0,0,0,.08);
 }
 .retention { padding: 8px 12px; color: var(--bk-text-sub, #888); font-size: 12px; }
+.action-error {
+  padding: 10px 12px; margin-bottom: 12px; border-radius: 8px;
+  background: #fdecec; color: #c03030; font-size: 13px;
+  border: 1px solid #f3c1c1; white-space: pre-wrap; word-break: break-all;
+}
 </style>

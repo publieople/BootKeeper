@@ -9,36 +9,33 @@ use std::path::PathBuf;
 use crate::write::{WriteOp, WriteResult};
 use crate::Error;
 
-/// Where request/result temp files go (default: BOOTKEEPER_DATA/tmp).
-pub fn tmp_dir() -> PathBuf {
-    std::env::var_os("BOOTKEEPER_DATA")
+/// Shared data root for request/result files and snapshots.
+///
+/// Uses `%ProgramData%\BootKeeper` (NOT %APPDATA%): the elevated helper runs
+/// as a different user (admin profile) so %APPDATA% would resolve to a
+/// different directory than the non-elevated GUI/CLI that spawned it. The
+/// request file must be visible to both sides.
+pub fn data_root() -> PathBuf {
+    if let Ok(p) = std::env::var("BOOTKEEPER_DATA") {
+        return PathBuf::from(p);
+    }
+    #[cfg(windows)]
+    let base = std::env::var("ProgramData")
         .map(PathBuf::from)
-        .unwrap_or_else(|| {
-            #[cfg(windows)]
-            let base = std::env::var("APPDATA")
-                .map(PathBuf::from)
-                .unwrap_or_else(|_| PathBuf::from("."));
-            #[cfg(not(windows))]
-            let base = PathBuf::from(".");
-            base.join("BootKeeper")
-        })
-        .join("tmp")
+        .unwrap_or_else(|_| PathBuf::from("C:\\ProgramData"));
+    #[cfg(not(windows))]
+    let base = PathBuf::from(".");
+    base.join("BootKeeper")
 }
 
-/// Default snapshot store dir (BOOTKEEPER_DATA/snapshots).
+/// Where request/result temp files go.
+pub fn tmp_dir() -> PathBuf {
+    data_root().join("tmp")
+}
+
+/// Where snapshots live.
 pub fn snapshot_dir() -> PathBuf {
-    std::env::var_os("BOOTKEEPER_DATA")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| {
-            #[cfg(windows)]
-            let base = std::env::var("APPDATA")
-                .map(PathBuf::from)
-                .unwrap_or_else(|_| PathBuf::from("."));
-            #[cfg(not(windows))]
-            let base = PathBuf::from(".");
-            base.join("BootKeeper")
-        })
-        .join("snapshots")
+    data_root().join("snapshots")
 }
 
 /// Run a write operation through the elevated helper (confirmation dialog).
@@ -242,7 +239,9 @@ mod tests {
         // On Linux this always errors; on Windows it would need a live helper.
         #[cfg(not(windows))]
         {
-            let r = run_helper(WriteOp::Disable { item_id: "x".into() });
+            let r = run_helper(WriteOp::Disable {
+                item_id: "x".into(),
+            });
             assert!(r.is_err());
         }
         #[cfg(windows)]

@@ -93,19 +93,10 @@ fn main() {
     }
 }
 
-/// Where snapshots live. M2 will allow overriding via env/config.
+/// Where snapshots live. Uses the shared launcher data root (ProgramData on
+/// Windows so elevated helper and non-elevated CLI/GUI agree on paths).
 fn data_root() -> PathBuf {
-    std::env::var_os("BOOTKEEPER_DATA")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| {
-            #[cfg(windows)]
-            let base = std::env::var("APPDATA")
-                .map(PathBuf::from)
-                .unwrap_or_else(|_| PathBuf::from("."));
-            #[cfg(not(windows))]
-            let base = PathBuf::from(".");
-            base.join("BootKeeper")
-        })
+    bootkeeper_core::windows::launcher::data_root()
 }
 
 fn snapshot_dir() -> PathBuf {
