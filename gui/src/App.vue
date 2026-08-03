@@ -18,9 +18,17 @@ interface StartupItem {
   enabled: boolean
 }
 
+interface SnapshotMeta {
+  id: string
+  created_at: string
+  operation: string
+  entry_count: number
+}
+
 const items = ref<StartupItem[]>([])
+const snapshots = ref<SnapshotMeta[]>([])
 const loading = ref(true)
-const currentCategory = ref<'all' | 'registry_run' | 'startup_folder' | 'scheduled_task'>('all')
+const currentTab = ref<'all' | 'registry_run' | 'startup_folder' | 'scheduled_task' | 'snapshots'>('all')
 const { t } = useI18n()
 
 async function fetchItems() {
@@ -34,12 +42,23 @@ async function fetchItems() {
   }
 }
 
-onMounted(fetchItems)
+async function fetchSnapshots() {
+  try {
+    snapshots.value = (await invoke<SnapshotMeta[]>('list_snapshots')) ?? []
+  } catch (e) {
+    console.error('list_snapshots failed:', e)
+  }
+}
+
+onMounted(() => {
+  fetchItems()
+  fetchSnapshots()
+})
 
 const filtered = computed(() =>
-  currentCategory.value === 'all'
+  currentTab.value === 'all'
     ? items.value
-    : items.value.filter((i) => i.category === currentCategory.value),
+    : items.value.filter((i) => i.category === currentTab.value),
 )
 
 const categoryLabels: Record<string, string> = {
@@ -49,7 +68,7 @@ const categoryLabels: Record<string, string> = {
   scheduled_task: 'nav.task',
 }
 
-const tabs = ['all', 'registry_run', 'startup_folder', 'scheduled_task'] as const
+const tabs = ['all', 'registry_run', 'startup_folder', 'scheduled_task', 'snapshots'] as const
 
 function riskTag(risk: StartupItem['risk']) {
   const map = { low: 'success', medium: 'warning', high: 'error' } as const
@@ -66,8 +85,25 @@ async function doAction(action: 'enable' | 'disable' | 'remove', item: StartupIt
   try {
     await invoke('run_write_action', { action, id: item.id })
     await fetchItems()
+    await fetchSnapshots()
   } catch (e) {
     console.error('write action failed:', e)
+  }
+}
+
+// Restore the first entry of a snapshot (v1: single-entry snapshots).
+async function restoreSnapshot(snap: SnapshotMeta) {
+  try {
+    // The snapshot's first entry carries item_id; restore it.
+    const detail = await invoke<any>('restore_item', {
+      snapshotId: snap.id,
+      itemId: '', // resolved server-side to first entry if empty
+    })
+    console.log('restore result:', detail)
+    await fetchItems()
+    await fetchSnapshots()
+  } catch (e) {
+    console.error('restore failed:', e)
   }
 }
 
@@ -114,6 +150,20 @@ const columns: DataTableColumns<StartupItem> = [
       ]),
   },
 ]
+
+const snapshotColumns: DataTableColumns<SnapshotMeta> = [
+  { title: () => t('table.snap_time'), key: 'created_at', width: 200 },
+  { title: () => t('table.snap_op'), key: 'operation', width: 120 },
+  { title: () => t('table.snap_count'), key: 'entry_count', width: 90 },
+  {
+    title: () => t('table.snap_actions'),
+    key: 'actions',
+    width: 120,
+    render: (row) =>
+      h(NButton, { size: 'small', type: 'primary', onClick: () => restoreSnapshot(row) }, () =>
+        t('action.restore')),
+  },
+]
 </script>
 
 <template>
@@ -135,15 +185,28 @@ const columns: DataTableColumns<StartupItem> = [
       <button
         v-for="tab in tabs"
         :key="tab"
-        :class="['tab', { active: currentCategory === tab }]"
-        @click="currentCategory = tab"
+        :class="['tab', { active: currentTab === tab }]"
+        @click="currentTab = tab"
       >
-        {{ t(categoryLabels[tab]) }}
+        {{ t(categoryLabels[tab] ?? `nav.${tab}`) }}
       </button>
     </nav>
 
     <main>
+      <div v-if="currentTab === 'snapshots'">
+        <p class="retention">{{ t('snapshot_retention') }}</p>
+        <NDataTable
+          :columns="snapshotColumns"
+          :data="snapshots"
+          :row-key="(row: SnapshotMeta) => row.id"
+        >
+          <template #empty>
+            <NEmpty :description="t('empty_snapshots')" />
+          </template>
+        </NDataTable>
+      </div>
       <NDataTable
+        v-else
         :columns="columns"
         :data="filtered"
         :loading="loading"
@@ -173,7 +236,7 @@ body {
 }
 .app-header h1 { font-size: 24px; }
 .subtitle { color: #666; font-size: 13px; margin-top: 2px; }
-.tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+.tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
 .tab {
   padding: 6px 14px; border: 1px solid #ddd; border-radius: 999px;
   background: #fff; cursor: pointer; font-size: 13px; color: #555;
@@ -182,4 +245,5 @@ body {
 .tab:hover { border-color: #18a058; color: #18a058; }
 .tab.active { background: #18a058; border-color: #18a058; color: #fff; }
 main { background: #fff; border-radius: 12px; padding: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+.retention { padding: 8px 12px; color: #888; font-size: 12px; }
 </style>

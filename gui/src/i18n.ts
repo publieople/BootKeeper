@@ -3,7 +3,7 @@ import { createI18n } from 'vue-i18n'
 const messages = {
   zh: {
     app: { title: 'BootKeeper', subtitle: 'Windows 自启动管理' },
-    nav: { all: '全部', registry: '注册表', folder: '启动文件夹', task: '计划任务' },
+    nav: { all: '全部', registry: '注册表', folder: '启动文件夹', task: '计划任务', snapshots: '快照' },
     table: {
       name: '名称',
       category: '类别',
@@ -13,6 +13,10 @@ const messages = {
       risk: '风险',
       status: '状态',
       actions: '操作',
+      snap_time: '时间',
+      snap_op: '操作',
+      snap_count: '条目数',
+      snap_actions: '操作',
     },
     risk: { low: '低', medium: '中', high: '高' },
     sig: { none: '未签名', valid: '有效', invalid: '无效', unknown: '未知' },
@@ -22,14 +26,17 @@ const messages = {
       disable: '禁用',
       remove: '删除',
       refresh: '刷新',
+      restore: '恢复',
       analyzing: '分析中…',
     },
     empty: '暂无启动项',
+    empty_snapshots: '暂无快照（执行过禁用/删除后会出现）',
     error: '加载失败',
+    snapshot_retention: '快照保留 7 天',
   },
   en: {
     app: { title: 'BootKeeper', subtitle: 'Windows autostart manager' },
-    nav: { all: 'All', registry: 'Registry', folder: 'Startup folder', task: 'Scheduled tasks' },
+    nav: { all: 'All', registry: 'Registry', folder: 'Startup folder', task: 'Scheduled tasks', snapshots: 'Snapshots' },
     table: {
       name: 'Name',
       category: 'Category',
@@ -39,6 +46,10 @@ const messages = {
       risk: 'Risk',
       status: 'Status',
       actions: 'Actions',
+      snap_time: 'Time',
+      snap_op: 'Operation',
+      snap_count: 'Entries',
+      snap_actions: 'Actions',
     },
     risk: { low: 'Low', medium: 'Medium', high: 'High' },
     sig: { none: 'Unsigned', valid: 'Valid', invalid: 'Invalid', unknown: 'Unknown' },
@@ -48,10 +59,13 @@ const messages = {
       disable: 'Disable',
       remove: 'Remove',
       refresh: 'Refresh',
+      restore: 'Restore',
       analyzing: 'Analyzing…',
     },
     empty: 'No startup items',
+    empty_snapshots: 'No snapshots (they appear after disable/remove)',
     error: 'Failed to load',
+    snapshot_retention: 'Snapshots kept for 7 days',
   },
 }
 

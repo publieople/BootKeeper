@@ -196,176 +196,60 @@ fn cmd_analyze(category: Option<&str>) -> Result<String, String> {
 
 /// Write chain: build request, launch elevated helper, wait, read result.
 fn cmd_write(id: &str, op_name: &str, restore_snapshot_id: Option<&str>) -> Result<String, String> {
-    #[cfg(not(windows))]
-    {
-        let _ = (id, op_name, restore_snapshot_id);
-        return Err("write commands are Windows-only (bootkeeper-helper)".into());
-    }
+    let op = match op_name {
+        "disable" => bootkeeper_core::WriteOp::Disable {
+            item_id: id.to_string(),
+        },
+        "enable" => bootkeeper_core::WriteOp::Enable {
+            item_id: id.to_string(),
+        },
+        "remove" => bootkeeper_core::WriteOp::Remove {
+            item_id: id.to_string(),
+        },
+        "restore" => {
+            let snap_id = restore_snapshot_id
+                .ok_or_else(|| "restore requires --snapshot-id".to_string())?;
+            let store = bootkeeper_core::SnapshotStore::new(snapshot_dir());
+            let snap = store.get(snap_id).map_err(|e| e.to_string())?;
+            let entry = snap
+                .entries
+                .iter()
+                .find(|e| e.item_id == id)
+                .ok_or_else(|| format!("item {id} not in snapshot {snap_id}"))?
+                .clone();
+            return cmd_restore(entry, snap_id);
+        }
+        _ => return Err(format!("unknown write op: {op_name}")),
+    };
 
     #[cfg(windows)]
     {
-
-        let dir = data_root().join("tmp");
-        std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-        let req_path = dir.join(format!("{op_name}-{}.json", std::process::id()));
-        let res_path = dir.join(format!("result-{}.json", std::process::id()));
-
-        let op = match op_name {
-            "disable" => bootkeeper_core::WriteOp::Disable {
-                item_id: id.to_string(),
-            },
-            "enable" => bootkeeper_core::WriteOp::Enable {
-                item_id: id.to_string(),
-            },
-            "remove" => bootkeeper_core::WriteOp::Remove {
-                item_id: id.to_string(),
-            },
-            "restore" => {
-                let snap_id = restore_snapshot_id
-                    .ok_or_else(|| "restore requires --snapshot-id".to_string())?;
-                let store = bootkeeper_core::SnapshotStore::new(snapshot_dir());
-                let snap = store.get(snap_id).map_err(|e| e.to_string())?;
-                let entry = snap
-                    .entries
-                    .iter()
-                    .find(|e| e.item_id == id)
-                    .ok_or_else(|| format!("item {id} not in snapshot {snap_id}"))?
-                    .clone();
-                // restore 走独立路径：直接调 helper 传 snapshot entry
-                return cmd_restore(entry, snap_id);
-            }
-            _ => return Err(format!("unknown write op: {op_name}")),
-        };
-        let request = json!({
-            "operation": op,
-            "snapshot_dir": snapshot_dir().to_string_lossy(),
-        });
-        std::fs::write(&req_path, serde_json::to_vec_pretty(&request).map_err(|e| e.to_string())?)
-            .map_err(|e| e.to_string())?;
-
-        // Launch the helper elevated via ShellExecuteW runas.
-        launch_helper_elevated(&req_path, &res_path)?;
-
-        // Wait for the result file.
-        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(120);
-        loop {
-            if res_path.exists() {
-                break;
-            }
-            if std::time::Instant::now() > deadline {
-                return Err("timed out waiting for helper (user may not have confirmed)".into());
-            }
-            std::thread::sleep(std::time::Duration::from_millis(300));
-        }
-
-        let bytes = std::fs::read(&res_path).map_err(|e| e.to_string())?;
-        let _ = std::fs::remove_file(&req_path);
-        let _ = std::fs::remove_file(&res_path);
-        let result: bootkeeper_core::WriteResult =
-            serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
+        let result = bootkeeper_core::windows::run_helper(op).map_err(|e| e.to_string())?;
         serde_json::to_string_pretty(&result).map_err(|e| e.to_string())
     }
+    #[cfg(not(windows))]
+    {
+        let _ = op;
+        Err("write commands are Windows-only (bootkeeper-helper)".into())
+    }
 }
 
-/// Launch the helper elevated via ShellExecuteW "runas" (UAC prompt).
-/// Blocks until the elevated process exits.
-#[cfg(windows)]
-fn launch_helper_elevated(
-    req_path: &std::path::Path,
-    res_path: &std::path::Path,
-) -> Result<(), String> {
-    use windows::core::HSTRING;
-    use windows::Win32::UI::WindowsAndMessaging::SW_HIDE;
-    use windows::Win32::UI::Shell::ShellExecuteW;
-
-    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
-    let dir = exe.parent().ok_or_else(|| "no exe dir".to_string())?;
-    let helper = dir.join("bootkeeper-helper.exe");
-
-    let verb = HSTRING::from("runas");
-    let file = HSTRING::from(helper.to_string_lossy().as_ref());
-    let params = HSTRING::from(format!(
-        "\"{}\" \"{}\"",
-        req_path.to_string_lossy(),
-        res_path.to_string_lossy()
-    ));
-    let directory = HSTRING::from(dir.to_string_lossy().as_ref());
-
-    let hinst = unsafe {
-        ShellExecuteW(
-            None,
-            &verb,
-            &file,
-            &params,
-            &directory,
-            SW_HIDE,
-        )
-    };
-    // HINSTANCE <= 32 means an error (see ShellExecute docs).
-    if hinst.0 as isize <= 32 {
-        return Err(format!(
-            "failed to launch helper (ShellExecuteW runas code {})",
-            hinst.0 as isize
-        ));
-    }
-
-    // Wait for the helper to finish writing the result. Poll the file
-    // instead of the process handle — simpler and avoids handle juggling.
-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(120);
-    while !res_path.exists() {
-        if std::time::Instant::now() > deadline {
-            return Err("timed out waiting for helper".into());
-        }
-        std::thread::sleep(std::time::Duration::from_millis(300));
-    }
-    Ok(())
-}
-
-/// Restore chain: build a request with the snapshot entry, launch helper.
+/// Restore chain: shared launcher with a snapshot entry.
 fn cmd_restore(entry: bootkeeper_core::SnapshotEntry, snap_id: &str) -> Result<String, String> {
+    #[cfg(windows)]
+    {
+        let result = bootkeeper_core::windows::launcher::run_restore(
+            entry,
+            snap_id,
+            snapshot_dir(),
+        )
+        .map_err(|e| e.to_string())?;
+        serde_json::to_string_pretty(&result).map_err(|e| e.to_string())
+    }
     #[cfg(not(windows))]
     {
         let _ = (entry, snap_id);
-        return Err("restore is Windows-only (bootkeeper-helper)".into());
-    }
-
-    #[cfg(windows)]
-    {
-        let dir = data_root().join("tmp");
-        std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-        let req_path = dir.join(format!("restore-{}.json", std::process::id()));
-        let res_path = dir.join(format!("result-{}.json", std::process::id()));
-
-        let request = json!({
-            "restore": entry,
-            "snapshot_id": snap_id,
-            "snapshot_dir": snapshot_dir().to_string_lossy(),
-        });
-        std::fs::write(
-            &req_path,
-            serde_json::to_vec_pretty(&request).map_err(|e| e.to_string())?,
-        )
-        .map_err(|e| e.to_string())?;
-
-        launch_helper_elevated(&req_path, &res_path)?;
-
-        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(120);
-        loop {
-            if res_path.exists() {
-                break;
-            }
-            if std::time::Instant::now() > deadline {
-                return Err("timed out waiting for helper".into());
-            }
-            std::thread::sleep(std::time::Duration::from_millis(300));
-        }
-
-        let bytes = std::fs::read(&res_path).map_err(|e| e.to_string())?;
-        let _ = std::fs::remove_file(&req_path);
-        let _ = std::fs::remove_file(&res_path);
-        let result: bootkeeper_core::WriteResult =
-            serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
-        serde_json::to_string_pretty(&result).map_err(|e| e.to_string())
+        Err("restore is Windows-only (bootkeeper-helper)".into())
     }
 }
 

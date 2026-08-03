@@ -3,6 +3,7 @@
 //! Everything here is Windows-only and gated behind #[cfg(windows)] so the
 //! crate still compiles (and unit-tests run) on non-Windows hosts.
 
+pub mod launcher;
 #[cfg(windows)]
 pub mod ops;
 #[cfg(windows)]
@@ -14,6 +15,7 @@ pub mod signature;
 #[cfg(windows)]
 pub mod startup_folder;
 
+pub use launcher::{run_helper, run_helper_with_snapshot_dir, snapshot_dir, tmp_dir};
 #[cfg(windows)]
 pub use ops::{disable, enable, remove, restore};
 #[cfg(windows)]
