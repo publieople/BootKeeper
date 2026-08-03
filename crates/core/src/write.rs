@@ -63,9 +63,9 @@ mod tests {
     #[test]
     fn parse_item_id_roundtrip() {
         let (cat, loc, name) =
-            parse_item_id("registry_run:HKCU\\...\\Run:OneDrive").unwrap();
+            parse_item_id("registry_run:HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run:OneDrive").unwrap();
         assert_eq!(cat, Category::RegistryRun);
-        assert_eq!(loc, "HKCU\\...\\Run");
+        assert_eq!(loc, "HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run");
         assert_eq!(name, "OneDrive");
     }
 
@@ -78,7 +78,7 @@ mod tests {
     #[test]
     fn writeop_json_roundtrips() {
         let op = WriteOp::Disable {
-            item_id: "registry_run:HKCU\\...\\Run:Foo".into(),
+            item_id: "registry_run:HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run:Foo".into(),
         };
         let json = serde_json::to_string(&op).unwrap();
         let back: WriteOp = serde_json::from_str(&json).unwrap();

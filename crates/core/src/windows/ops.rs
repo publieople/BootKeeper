@@ -282,8 +282,7 @@ fn parse_hive_and_key(
     } else {
         return Err(Error::Msg(format!("bad hive in key path: {key_path}")));
     };
-    // Skip the literal "...\" segment if present.
-    Ok((RegKey::predef(hive), rest.strip_prefix("...\\").unwrap_or(rest)))
+    Ok((RegKey::predef(hive), rest))
 }
 
 /// Connect to Task Scheduler COM service and return the root folder.

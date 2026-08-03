@@ -283,7 +283,7 @@ mod tests {
     fn request_roundtrips() {
         let req = Request {
             operation: Some(bootkeeper_core::WriteOp::Disable {
-                item_id: "registry_run:HKCU\\...\\Run:Foo".into(),
+                item_id: "registry_run:HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run:Foo".into(),
             }),
             restore: None,
             snapshot_id: None,

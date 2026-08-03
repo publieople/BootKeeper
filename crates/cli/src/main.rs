@@ -48,8 +48,8 @@ enum Commands {
         category: String,
         name: String,
         command: String,
-        /// For registry_run: HKCU\...\Run or HKLM\...\Run. For startup_folder: user_startup.
-        #[arg(long, default_value = "HKCU\\...\\Run")]
+        /// For registry_run: HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run or HKLM\...\Run. For startup_folder: user_startup.
+        #[arg(long, default_value = "HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run")]
         location: String,
     },
     /// Snapshot store operations.

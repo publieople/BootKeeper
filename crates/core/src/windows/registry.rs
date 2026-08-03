@@ -39,8 +39,8 @@ pub fn enumerate_registry_run() -> Vec<RawEntry> {
     ];
 
     for (hive_name, hive) in hives {
-        for (subkey_name, subkey_path) in [("Run", RUN_KEY), ("RunOnce", RUNONCE_KEY)] {
-            let key_path = format!("{hive_name}\\...\\{subkey_name}");
+        for (_, subkey_path) in [("Run", RUN_KEY), ("RunOnce", RUNONCE_KEY)] {
+            let key_path = format!("{hive_name}\\{subkey_path}");
             match RegKey::predef(hive).open_subkey_with_flags(subkey_path, KEY_READ) {
                 Ok(key) => {
                     for (name, value) in key.enum_values().flatten() {

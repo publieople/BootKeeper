@@ -58,13 +58,13 @@ pub struct AddParam {
     pub name: String,
     /// Command (registry) or source file path (startup folder)
     pub command: String,
-    /// For registry_run: HKCU\...\Run or HKLM\...\Run. Default HKCU\...\Run.
+    /// For registry_run: HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run or HKLM\...\Run. Default HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run.
     #[serde(default = "default_location")]
     pub location: String,
 }
 
 fn default_location() -> String {
-    "HKCU\\...\\Run".into()
+    "HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run".into()
 }
 
 #[derive(Serialize, Deserialize, JsonSchema)]

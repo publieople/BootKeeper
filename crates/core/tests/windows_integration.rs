@@ -3,11 +3,8 @@
 
 #![cfg(windows)]
 
-use bootkeeper_core::windows::{
-    enumerate_all, enumerate_registry_run, enumerate_scheduled_tasks, enumerate_startup_folders,
-};
-use bootkeeper_core::{enrich, model::Signature};
-use winreg::enums::{HKEY_CURRENT_USER, KEY_READ, KEY_WRITE, REG_SZ};
+use bootkeeper_core::windows::enumerate_registry_run;
+use winreg::enums::{HKEY_CURRENT_USER, REG_SZ};
 use winreg::{RegKey, RegValue};
 
 /// Create a throwaway HKCU Run value, disable it via the real ops path, verify
@@ -56,7 +53,7 @@ fn disable_rename_roundtrip_on_real_registry() {
     assert!(disabled.is_some(), "disabled value should be enumerated");
 
     // 5. Cleanup: delete both possible names.
-    let _ = run_key.delete_value(&format!("{TEST_NAME}.disabled"));
+    let _ = run_key.delete_value(format!("{TEST_NAME}.disabled"));
     let _ = run_key.delete_value(TEST_NAME);
 }
 
