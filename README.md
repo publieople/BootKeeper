@@ -2,7 +2,7 @@
 
 Windows 自启动管理工具：现代 UI（Material Design 3）、中英 i18n、AI 可调用。
 
-开源免费（GPL-3.0）。当前处于早期开发：**M1 完成（CLI 读链路）**。
+开源免费（GPL-3.0）。当前处于早期开发：**M4 进行中（CLI + GUI + helper + MCP 全链路）**。
 
 ## 状态
 
