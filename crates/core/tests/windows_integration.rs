@@ -80,14 +80,14 @@ fn disable_rename_roundtrip_on_real_registry() {
 fn startup_folder_disable_keep_visible() {
     let dir = bootkeeper_core::windows::startup_folder::startup_folder_path("user_startup")
         .expect("user startup folder exists");
-    let test_file = std::path::Path::new(&dir).join("BootKeeperCITest.txt");
+    let test_file = std::path::Path::new(&dir).join("BootKeeperCITest.bat");
     // Create a dummy file (not .lnk, just a text file to test the rename).
     std::fs::write(&test_file, "test").expect("create test file");
 
     // Build id from enumerator output.
     let raw = bootkeeper_core::windows::enumerate_startup_folders()
         .into_iter()
-        .find(|e| e.name == "BootKeeperCITest.txt")
+        .find(|e| e.name == "BootKeeperCITest.bat")
         .expect("enumerator sees test file");
     let id = bootkeeper_core::model::StartupItem::build_id(
         raw.category, &raw.location, &raw.name,
@@ -101,7 +101,7 @@ fn startup_folder_disable_keep_visible() {
     // Re-enumerate: the disabled file MUST appear.
     let disabled = bootkeeper_core::windows::enumerate_startup_folders()
         .into_iter()
-        .find(|e| e.name == "BootKeeperCITest.txt.disabled");
+        .find(|e| e.name == "BootKeeperCITest.bat.disabled");
     assert!(
         disabled.is_some(),
         "disabled file should still be enumerated (was filtered by extension)"
