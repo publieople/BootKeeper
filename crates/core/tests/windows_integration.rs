@@ -122,6 +122,15 @@ fn startup_folder_disable_keep_visible() {
     let _ = std::fs::remove_file(&test_file);
 }
 
+/// Read StartupApproved keys — must not panic even when keys are absent.
+#[test]
+fn startup_approved_read_safe() {
+    use bootkeeper_core::windows::startup_approved::is_approved_disabled;
+    // CI runner likely has no entries; function returns false, never panics.
+    let _ = is_approved_disabled("HKCU", "Run", "NoSuchValueForSure");
+    let _ = is_approved_disabled("HKLM", "StartupFolder", "dummy");
+}
+
 /// Verify the launcher data root resolves to a cross-privilege safe location
 /// (ProgramData on Windows) — the elevated helper must share it.
 #[test]

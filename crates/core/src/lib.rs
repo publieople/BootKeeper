@@ -38,6 +38,8 @@ pub fn enrich(
 ) -> StartupItem {
     let signature = sig_verifier(&raw.command);
     let rule = rules::evaluate(raw, signature, None);
+    let tm_disabled = windows::startup_approved::is_entry_approved_disabled(raw);
+
     StartupItem {
         id: StartupItem::build_id(raw.category, &raw.location, &raw.name),
         category: raw.category,
@@ -47,7 +49,7 @@ pub fn enrich(
         signature,
         publisher: None,
         risk: rule.risk,
-        enabled: !raw.name.ends_with(".disabled"),
+        enabled: !raw.name.ends_with(".disabled") && !tm_disabled,
     }
 }
 

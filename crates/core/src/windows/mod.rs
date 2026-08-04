@@ -15,6 +15,8 @@ pub mod services;
 #[cfg(windows)]
 pub mod signature;
 #[cfg(windows)]
+pub mod startup_approved;
+#[cfg(windows)]
 pub mod startup_folder;
 
 pub use launcher::{run_helper, run_helper_with_snapshot_dir, snapshot_dir, tmp_dir};
