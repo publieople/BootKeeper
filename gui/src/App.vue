@@ -55,7 +55,12 @@ const addRules: FormRules = {
 async function fetchItems() {
   loading.value = true
   try {
-    items.value = (await invoke<StartupItem[]>('list_items')) ?? []
+    const raw = await invoke<StartupItem[]>('list_items')
+    items.value = raw ?? []
+    console.log(
+      'fetchItems:', items.value.length, 'total,',
+      items.value.filter((i) => i.name.endsWith('.disabled')).length, 'disabled'
+    )
   } catch (e) {
     console.error('list_items failed:', e)
   } finally {
@@ -74,7 +79,9 @@ async function fetchSnapshots() {
 onMounted(() => {
   fetchItems()
   fetchSnapshots()
-})
+    console.log("items count:", items.value.length, "disabled:", items.value.filter(function(i) { return i.name.endsWith(".disabled") }).map(function(i) { return i.name }))
+  })
+
 
 const filtered = computed(() => {
   let list = currentTab.value === 'all'
@@ -221,7 +228,11 @@ const snapshotColumns: DataTableColumns<SnapshotMeta> = [
   <div class="app">
     <header class="app-header">
       <div>
-        <h1>{{ t('app.title') }}</h1>
+        <h1>{{ t('app.title') }}
+          <span style="font-size:14px;opacity:0.5;margin-left:8px">
+            {{ items.length }} {{ dark ? '●' : '○' }}
+          </span>
+        </h1>
         <p class="subtitle">{{ t('app.subtitle') }}</p>
       </div>
       <NSpace>
