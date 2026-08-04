@@ -52,8 +52,25 @@ fn disable_rename_roundtrip_on_real_registry() {
         .find(|e| e.name == format!("{TEST_NAME}.disabled"));
     assert!(disabled.is_some(), "disabled value should be enumerated");
 
-    // 5. Cleanup: delete both possible names.
-    let _ = run_key.delete_value(format!("{TEST_NAME}.disabled"));
+    // 5. Enable: rename back. Uses the id with .disabled suffix.
+    let disabled = enumerate_registry_run()
+        .into_iter()
+        .find(|e| e.name == format!("{TEST_NAME}.disabled"))
+        .expect("disabled value found");
+    let disabled_id = bootkeeper_core::model::StartupItem::build_id(
+        disabled.category, &disabled.location, &disabled.name,
+    );
+    let en = bootkeeper_core::windows::ops::enable(&disabled_id)
+        .expect("enable succeeds");
+    assert!(en.ok, "enable should report ok: {:?}", en.message);
+
+    // 6. Verify restored.
+    let restored = enumerate_registry_run()
+        .into_iter()
+        .find(|e| e.name == TEST_NAME);
+    assert!(restored.is_some(), "value should be restored to original name");
+
+    // 7. Cleanup.
     let _ = run_key.delete_value(TEST_NAME);
 }
 
