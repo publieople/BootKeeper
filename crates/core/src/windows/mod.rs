@@ -11,6 +11,8 @@ pub mod registry;
 #[cfg(windows)]
 pub mod scheduled_task;
 #[cfg(windows)]
+pub mod services;
+#[cfg(windows)]
 pub mod signature;
 #[cfg(windows)]
 pub mod startup_folder;
@@ -22,6 +24,8 @@ pub use ops::{add, disable, enable, remove, restore};
 pub use registry::enumerate_registry_run;
 #[cfg(windows)]
 pub use scheduled_task::enumerate_scheduled_tasks;
+#[cfg(windows)]
+pub use services::enumerate_services;
 #[cfg(windows)]
 pub use startup_folder::enumerate_startup_folders;
 

@@ -33,6 +33,9 @@ pub fn disable(item_id: &str) -> Result<WriteResult, Error> {
                 snapshot_entry: Some(entry),
             })
         }
+        Category::Service => Err(Error::Msg(
+            "services are not supported for write operations yet".into(),
+        )),
         _ => {
             if name.ends_with(DISABLED_SUFFIX) {
                 return Ok(WriteResult {
@@ -66,6 +69,9 @@ pub fn enable(item_id: &str) -> Result<WriteResult, Error> {
                 snapshot_entry: Some(entry),
             })
         }
+        Category::Service => Err(Error::Msg(
+            "services are not supported for write operations yet".into(),
+        )),
         _ => {
             if !name.ends_with(DISABLED_SUFFIX) {
                 return Ok(WriteResult {
@@ -94,6 +100,9 @@ pub fn remove(item_id: &str) -> Result<WriteResult, Error> {
         Category::RegistryRun => remove_registry_value(&location, &name, item_id),
         Category::StartupFolder => remove_file(&location, &name, item_id),
         Category::ScheduledTask => remove_task(&location, &name, item_id),
+        Category::Service => Err(Error::Msg(
+            "services are not supported for write operations yet".into(),
+        )),
     }
 }
 
@@ -106,8 +115,8 @@ fn rename_entry(item_id: &str, old_name: &str, new_name: &str) -> Result<Snapsho
     match cat {
         Category::RegistryRun => rename_registry_value(&location, old_name, new_name, item_id),
         Category::StartupFolder => rename_file(&location, old_name, new_name, item_id),
-        Category::ScheduledTask => Err(Error::Msg(
-            "rename not supported for scheduled tasks (use task state)".into(),
+        Category::ScheduledTask | Category::Service => Err(Error::Msg(
+            "rename not supported for scheduled tasks or services".into(),
         )),
     }
 }
@@ -353,6 +362,9 @@ pub fn restore(snap: &crate::model::SnapshotEntry) -> Result<WriteResult, Error>
         Category::RegistryRun => restore_registry(snap),
         Category::StartupFolder => restore_file(snap),
         Category::ScheduledTask => restore_task(snap),
+        Category::Service => Err(Error::Msg(
+            "services are not supported for restore yet".into(),
+        )),
     }
 }
 
@@ -452,8 +464,8 @@ pub fn add(op: &crate::write::WriteOpAdd) -> Result<WriteResult, Error> {
     match op.category {
         Category::RegistryRun => add_registry(op),
         Category::StartupFolder => add_file(op),
-        Category::ScheduledTask => Err(Error::Msg(
-            "adding scheduled tasks is not implemented in v1".into(),
+        Category::ScheduledTask | Category::Service => Err(Error::Msg(
+            "adding scheduled tasks/services is not implemented in v1".into(),
         )),
     }
 }

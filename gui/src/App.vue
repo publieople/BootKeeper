@@ -90,9 +90,10 @@ const categoryLabels: Record<string, string> = {
   registry_run: 'nav.registry',
   startup_folder: 'nav.folder',
   scheduled_task: 'nav.task',
+  service: 'nav.service',
 }
 
-const tabs = ['all', 'registry_run', 'startup_folder', 'scheduled_task', 'snapshots'] as const
+const tabs = ['all', 'registry_run', 'startup_folder', 'scheduled_task', 'service', 'snapshots'] as const
 
 function riskTag(risk: StartupItem['risk']) {
   const map = { low: 'success', medium: 'warning', high: 'error' } as const

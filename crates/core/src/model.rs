@@ -15,13 +15,16 @@ pub enum Category {
     StartupFolder,
     /// Task Scheduler
     ScheduledTask,
+    /// Windows services set to auto-start
+    Service,
 }
 
 impl Category {
-    pub const ALL: [Category; 3] = [
+    pub const ALL: [Category; 4] = [
         Category::RegistryRun,
         Category::StartupFolder,
         Category::ScheduledTask,
+        Category::Service,
     ];
 
     pub fn as_str(&self) -> &'static str {
@@ -29,6 +32,7 @@ impl Category {
             Category::RegistryRun => "registry_run",
             Category::StartupFolder => "startup_folder",
             Category::ScheduledTask => "scheduled_task",
+            Category::Service => "service",
         }
     }
 }
