@@ -12,7 +12,7 @@ import { dark, toggleDark } from './theme-state'
 
 interface StartupItem {
   id: string
-  category: 'registry_run' | 'startup_folder' | 'scheduled_task'
+  category: 'registry_run' | 'startup_folder' | 'scheduled_task' | 'service'
   name: string
   command: string
   location: string
@@ -106,6 +106,11 @@ function sigType(sig: StartupItem['signature']) {
   return 'default'
 }
 
+// Dim disabled rows in the DataTable.
+function rowProps(row: StartupItem) {
+  return row.enabled ? {} : { style: { opacity: '0.55' } }
+}
+
 async function doAction(action: 'enable' | 'disable' | 'remove', item: StartupItem) {
   actionError.value = ''
   try {
@@ -154,7 +159,7 @@ async function restoreSnapshot(snap: SnapshotMeta) {
 }
 
 const columns: DataTableColumns<StartupItem> = [
-  { title: () => t('table.name'), key: 'name', sorter: (a, b) => a.name.localeCompare(b.name), width: 140 },
+  { title: () => t('table.name'), key: 'name', sorter: (a, b) => a.name.localeCompare(b.name), width: 160 },
   {
     title: () => t('table.category'),
     key: 'category',
@@ -277,6 +282,7 @@ const snapshotColumns: DataTableColumns<SnapshotMeta> = [
         :loading="loading"
         :bordered="true"
         :row-key="(row: StartupItem) => row.id"
+        :row-props="rowProps"
       >
         <template #empty>
           <NEmpty :description="t('empty')" />
@@ -323,7 +329,7 @@ const snapshotColumns: DataTableColumns<SnapshotMeta> = [
 
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-html, body, #app { height: 100%; background: var(--bk-body-bg, #f5f5f5); }
+html, body, #app { height: 100%; }
 body {
   font-family: -apple-system, 'Segoe UI', 'Microsoft YaHei', sans-serif;
   background: var(--bk-body-bg, #f5f5f5);
@@ -353,7 +359,7 @@ main {
 .retention { padding: 8px 12px; color: var(--bk-text-sub, #888); font-size: 12px; }
 .action-error {
   padding: 10px 12px; margin-bottom: 12px; border-radius: 8px;
-  background: rgba(192, 48, 48, 0.12); color: #c03030; font-size: 13px;
-  border: 1px solid rgba(192, 48, 48, 0.25); white-space: pre-wrap; word-break: break-all;
+  background: var(--bk-error-bg, rgba(192,48,48,0.12)); color: #c03030; font-size: 13px;
+  border: 1px solid rgba(192,48,48,0.25); white-space: pre-wrap; word-break: break-all;
 }
 </style>
