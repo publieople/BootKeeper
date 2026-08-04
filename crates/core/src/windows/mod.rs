@@ -14,7 +14,6 @@ pub mod scheduled_task;
 pub mod services;
 #[cfg(windows)]
 pub mod signature;
-#[cfg(windows)]
 pub mod startup_approved;
 #[cfg(windows)]
 pub mod startup_folder;
