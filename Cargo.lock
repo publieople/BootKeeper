@@ -92,7 +92,7 @@ checksum = "b25655df2c3cdd83c5e5b293b88acd880332b2ddadd7c30ac43144fdc0033da9"
 
 [[package]]
 name = "bootkeeper-cli"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "bootkeeper-core",
  "clap",
@@ -103,7 +103,7 @@ dependencies = [
 
 [[package]]
 name = "bootkeeper-core"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "chrono",
  "serde",
@@ -116,7 +116,7 @@ dependencies = [
 
 [[package]]
 name = "bootkeeper-helper"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "bootkeeper-core",
  "serde",
@@ -126,7 +126,7 @@ dependencies = [
 
 [[package]]
 name = "bootkeeper-mcp"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "bootkeeper-core",
