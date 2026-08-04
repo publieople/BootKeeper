@@ -73,8 +73,8 @@ pub fn is_entry_approved_disabled(raw: &RawEntry) -> bool {
             };
             let subkey = raw
                 .location
-                .split('\\')
-                .last()
+                .rsplit('\\')
+                .next()
                 .unwrap_or("Run");
             is_approved_disabled(hive, subkey, &raw.name)
         }
