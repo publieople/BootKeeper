@@ -2,12 +2,13 @@
 import { ref, computed, onMounted, h } from 'vue'
 import {
   NButton, NDataTable, NTag, NSpace, NEmpty, NModal, NForm, NFormItem,
-  NInput, NSelect, NRadioGroup, NRadio,
+  NInput, NSelect, NRadioGroup, NRadio, NIcon,
 } from 'naive-ui'
-import { Refresh, Add as AddIcon } from '@vicons/ionicons5'
+import { Refresh, Add as AddIcon, Search as SearchIcon, Sunny as SunIcon, Moon as MoonIcon } from '@vicons/ionicons5'
 import { useI18n } from 'vue-i18n'
 import type { DataTableColumns, FormInst, FormRules } from 'naive-ui'
 import { invoke } from '@tauri-apps/api/core'
+import { dark, toggleDark } from './theme-state'
 
 interface StartupItem {
   id: string
@@ -31,8 +32,10 @@ interface SnapshotMeta {
 const items = ref<StartupItem[]>([])
 const snapshots = ref<SnapshotMeta[]>([])
 const loading = ref(true)
-const currentTab = ref<'all' | 'registry_run' | 'startup_folder' | 'scheduled_task' | 'snapshots'>('all')
+const currentTab = ref('all')
 const { t } = useI18n()
+const search = ref('')
+const actionError = ref('')
 
 // Add-entry dialog state
 const showAdd = ref(false)
@@ -40,7 +43,7 @@ const addForm = ref({
   category: 'registry_run' as 'registry_run' | 'startup_folder',
   name: '',
   command: '',
-  location: 'HKCU\\...\\Run',
+  location: 'HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run',
 })
 const addFormRef = ref<FormInst | null>(null)
 
@@ -73,11 +76,14 @@ onMounted(() => {
   fetchSnapshots()
 })
 
-const filtered = computed(() =>
-  currentTab.value === 'all'
+const filtered = computed(() => {
+  let list = currentTab.value === 'all'
     ? items.value
-    : items.value.filter((i) => i.category === currentTab.value),
-)
+    : items.value.filter((i) => i.category === currentTab.value)
+  const q = search.value.toLowerCase()
+  if (q) list = list.filter((i) => i.name.toLowerCase().includes(q) || i.command.toLowerCase().includes(q))
+  return list
+})
 
 const categoryLabels: Record<string, string> = {
   all: 'nav.all',
@@ -98,8 +104,6 @@ function sigType(sig: StartupItem['signature']) {
   if (sig === 'invalid') return 'error'
   return 'default'
 }
-
-const actionError = ref('')
 
 async function doAction(action: 'enable' | 'disable' | 'remove', item: StartupItem) {
   actionError.value = ''
@@ -138,14 +142,9 @@ async function submitAdd() {
   }
 }
 
-// Restore the first entry of a snapshot (v1: single-entry snapshots).
 async function restoreSnapshot(snap: SnapshotMeta) {
   try {
-    const detail = await invoke<any>('restore_item', {
-      snapshotId: snap.id,
-      itemId: '',
-    })
-    console.log('restore result:', detail)
+    await invoke<any>('restore_item', { snapshotId: snap.id, itemId: '' })
     await fetchItems()
     await fetchSnapshots()
   } catch (e) {
@@ -154,31 +153,31 @@ async function restoreSnapshot(snap: SnapshotMeta) {
 }
 
 const columns: DataTableColumns<StartupItem> = [
-  { title: () => t('table.name'), key: 'name', sorter: (a, b) => a.name.localeCompare(b.name) },
+  { title: () => t('table.name'), key: 'name', sorter: (a, b) => a.name.localeCompare(b.name), width: 140 },
   {
     title: () => t('table.category'),
     key: 'category',
-    width: 130,
+    width: 110,
     render: (row) => h(NTag, { size: 'small' }, () => t(categoryLabels[row.category])),
   },
   { title: () => t('table.command'), key: 'command', ellipsis: { tooltip: true } },
   {
     title: () => t('table.signature'),
     key: 'signature',
-    width: 110,
+    width: 100,
     render: (row) =>
       h(NTag, { size: 'small', type: sigType(row.signature) }, () => t(`sig.${row.signature}`)),
   },
   {
     title: () => t('table.risk'),
     key: 'risk',
-    width: 90,
+    width: 80,
     render: (row) => h(NTag, { size: 'small', type: riskTag(row.risk) }, () => t(`risk.${row.risk}`)),
   },
   {
     title: () => t('table.status'),
     key: 'enabled',
-    width: 100,
+    width: 90,
     render: (row) =>
       h(NTag, { size: 'small', type: row.enabled ? 'success' : 'default' }, () =>
         t(`status.${row.enabled ? 'enabled' : 'disabled'}`)),
@@ -220,12 +219,15 @@ const snapshotColumns: DataTableColumns<SnapshotMeta> = [
         <p class="subtitle">{{ t('app.subtitle') }}</p>
       </div>
       <NSpace>
+        <NButton size="small" @click="toggleDark" quaternary>
+          <template #icon><NIcon><component :is="dark ? SunIcon : MoonIcon" /></NIcon></template>
+        </NButton>
         <NButton size="small" type="primary" @click="showAdd = true">
-          <template #icon><AddIcon /></template>
+          <template #icon><NIcon><AddIcon /></NIcon></template>
           {{ t('action.add') }}
         </NButton>
         <NButton size="small" @click="fetchItems" :loading="loading">
-          <template #icon><Refresh /></template>
+          <template #icon><NIcon><Refresh /></NIcon></template>
           {{ t('action.refresh') }}
         </NButton>
       </NSpace>
@@ -241,6 +243,17 @@ const snapshotColumns: DataTableColumns<SnapshotMeta> = [
         {{ t(categoryLabels[tab] ?? `nav.${tab}`) }}
       </button>
     </nav>
+
+    <NInput
+      v-if="currentTab !== 'snapshots'"
+      v-model:value="search"
+      :placeholder="t('search.placeholder')"
+      clearable
+      size="small"
+      style="margin-bottom: 10px"
+    >
+      <template #prefix><NIcon><SearchIcon /></NIcon></template>
+    </NInput>
 
     <main>
       <div v-if="actionError" class="action-error">{{ actionError }}</div>
@@ -291,8 +304,8 @@ const snapshotColumns: DataTableColumns<SnapshotMeta> = [
           <NSelect
             v-model:value="addForm.location"
             :options="[
-              { label: 'HKCU\\...\\Run', value: 'HKCU\\...\\Run' },
-              { label: 'HKLM\\...\\Run', value: 'HKLM\\...\\Run' },
+              { label: 'HKCU\\...\\Run', value: 'HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run' },
+              { label: 'HKLM\\...\\Run', value: 'HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run' },
             ]"
           />
         </NFormItem>
@@ -309,7 +322,7 @@ const snapshotColumns: DataTableColumns<SnapshotMeta> = [
 
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-html, body, #app { height: 100%; }
+html, body, #app { height: 100%; background: var(--bk-body-bg, #f5f5f5); }
 body {
   font-family: -apple-system, 'Segoe UI', 'Microsoft YaHei', sans-serif;
   background: var(--bk-body-bg, #f5f5f5);
@@ -339,7 +352,7 @@ main {
 .retention { padding: 8px 12px; color: var(--bk-text-sub, #888); font-size: 12px; }
 .action-error {
   padding: 10px 12px; margin-bottom: 12px; border-radius: 8px;
-  background: #fdecec; color: #c03030; font-size: 13px;
-  border: 1px solid #f3c1c1; white-space: pre-wrap; word-break: break-all;
+  background: rgba(192, 48, 48, 0.12); color: #c03030; font-size: 13px;
+  border: 1px solid rgba(192, 48, 48, 0.25); white-space: pre-wrap; word-break: break-all;
 }
 </style>

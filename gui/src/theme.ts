@@ -3,6 +3,9 @@
 // Reads the Windows accent color (DWM AccentColor, ABGR) via a Tauri command,
 // then builds a Material 3 tonal palette with material-color-utilities and
 // maps it onto Naive UI's theme overrides (seed -> primary palette).
+//
+// Light scheme: primary tone ~40, surface tone ~98, neutral text ~10
+// Dark scheme:  primary tone ~80, surface tone ~6,  neutral text ~90
 
 import type { GlobalThemeOverrides } from 'naive-ui'
 import { argbFromHex, hexFromArgb, themeFromSourceColor, TonalPalette } from '@material/material-color-utilities'
@@ -29,27 +32,20 @@ function argbToCss(a: number): string {
   return hexFromArgb(a)
 }
 
-/** Build Naive UI theme overrides from a Material 3 source color. */
+/** Build Naive UI theme overrides from a Material 3 source color (light). */
 export function themeFromSeed(seed: number): Md3Theme {
   const scheme = themeFromSourceColor(seed)
-
-  // Material 3 tonal palette: primary/tertiary + neutral surfaces.
   const p = scheme.palettes.primary as TonalPalette
   const n = scheme.palettes.neutral as TonalPalette
   const nv = scheme.palettes.neutralVariant as TonalPalette
   const t = scheme.palettes.tertiary as TonalPalette
 
-  // Naive UI works on a light theme with overrides.
-  const primary = argbToCss(p.tone(40))
-  const primaryHover = argbToCss(p.tone(50))
-  const primaryPressed = argbToCss(p.tone(30))
-
   return {
     seed,
-    primary,
-    primaryHover,
-    primaryPressed,
-    info: primary,
+    primary: argbToCss(p.tone(40)),
+    primaryHover: argbToCss(p.tone(50)),
+    primaryPressed: argbToCss(p.tone(30)),
+    info: argbToCss(p.tone(40)),
     success: argbToCss(p.tone(60)),
     warning: argbToCss(t.tone(60)),
     error: argbToCss(p.tone(80)),
@@ -58,6 +54,31 @@ export function themeFromSeed(seed: number): Md3Theme {
     border: argbToCss(nv.tone(90)),
     text: argbToCss(n.tone(10)),
     textSub: argbToCss(nv.tone(50)),
+  }
+}
+
+/** Dark variant — same seed, inverted surface tones. */
+export function themeFromSeedDark(seed: number): Md3Theme {
+  const scheme = themeFromSourceColor(seed)
+  const p = scheme.palettes.primary as TonalPalette
+  const n = scheme.palettes.neutral as TonalPalette
+  const nv = scheme.palettes.neutralVariant as TonalPalette
+  const t = scheme.palettes.tertiary as TonalPalette
+
+  return {
+    seed,
+    primary: argbToCss(p.tone(80)),
+    primaryHover: argbToCss(p.tone(70)),
+    primaryPressed: argbToCss(p.tone(90)),
+    info: argbToCss(p.tone(80)),
+    success: argbToCss(p.tone(60)),
+    warning: argbToCss(t.tone(60)),
+    error: argbToCss(p.tone(60)),
+    bodyBg: argbToCss(n.tone(6)),
+    cardBg: argbToCss(n.tone(10)),
+    border: argbToCss(nv.tone(30)),
+    text: argbToCss(n.tone(90)),
+    textSub: argbToCss(nv.tone(80)),
   }
 }
 
@@ -80,9 +101,7 @@ export function themeOverrides(t: Md3Theme): GlobalThemeOverrides {
       fontSize: '14px',
       borderRadius: '8px',
     },
-    Button: {
-      borderRadiusMedium: '8px',
-    },
+    Button: { borderRadiusMedium: '8px' },
     DataTable: {
       thColor: t.cardBg,
       tdColor: t.cardBg,
@@ -91,12 +110,10 @@ export function themeOverrides(t: Md3Theme): GlobalThemeOverrides {
   }
 }
 
-/** Extract ABGR accent from DWM AccentColor value (0xAABBGGRR). */
 export function accentFromAbgr(v: number): number {
   const r = (v >> 16) & 0xff
   const g = (v >> 8) & 0xff
   const b = v & 0xff
-  // material-color-utilities wants 0xAARRGGBB
   return (0xff << 24) | (r << 16) | (g << 8) | b
 }
 
