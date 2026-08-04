@@ -53,7 +53,15 @@ pub fn enumerate_startup_folders() -> Vec<RawEntry> {
         };
         for entry in entries.flatten() {
             let name = entry.file_name().to_string_lossy().to_string();
-            let ext = PathBuf::from(&name)
+            // ponytail: strip .disabled before checking extension — disabled
+            // entries are renamed to foo.lnk.disabled so Path::extension
+            // returns "disabled" instead of "lnk".
+            let base = if name.ends_with(".disabled") {
+                &name[..name.len() - 9]
+            } else {
+                &name
+            };
+            let ext = PathBuf::from(base)
                 .extension()
                 .map(|e| e.to_string_lossy().to_lowercase())
                 .unwrap_or_default();

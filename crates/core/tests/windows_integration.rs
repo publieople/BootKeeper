@@ -74,6 +74,54 @@ fn disable_rename_roundtrip_on_real_registry() {
     let _ = run_key.delete_value(TEST_NAME);
 }
 
+/// Disable a startup folder shortcut: rename to .disabled, verify the
+/// enumerator still finds it (extension filter must strip .disabled first).
+#[test]
+fn startup_folder_disable_keep_visible() {
+    let dir = bootkeeper_core::windows::startup_folder::startup_folder_path("user_startup")
+        .expect("user startup folder exists");
+    let test_file = std::path::Path::new(&dir).join("BootKeeperCITest.txt");
+    // Create a dummy file (not .lnk, just a text file to test the rename).
+    std::fs::write(&test_file, "test").expect("create test file");
+
+    // Build id from enumerator output.
+    let raw = bootkeeper_core::windows::enumerate_startup_folders()
+        .into_iter()
+        .find(|e| e.name == "BootKeeperCITest.txt")
+        .expect("enumerator sees test file");
+    let id = bootkeeper_core::model::StartupItem::build_id(
+        raw.category, &raw.location, &raw.name,
+    );
+
+    // Disable (rename).
+    let res = bootkeeper_core::windows::ops::disable(&id)
+        .expect("disable succeeds");
+    assert!(res.ok, "disable should report ok");
+
+    // Re-enumerate: the disabled file MUST appear.
+    let disabled = bootkeeper_core::windows::enumerate_startup_folders()
+        .into_iter()
+        .find(|e| e.name == "BootKeeperCITest.txt.disabled");
+    assert!(
+        disabled.is_some(),
+        "disabled file should still be enumerated (was filtered by extension)"
+    );
+
+    // Enable back.
+    let disabled_entry = disabled.unwrap();
+    let disabled_id = bootkeeper_core::model::StartupItem::build_id(
+        disabled_entry.category,
+        &disabled_entry.location,
+        &disabled_entry.name,
+    );
+    let en = bootkeeper_core::windows::ops::enable(&disabled_id)
+        .expect("enable succeeds");
+    assert!(en.ok, "enable should report ok");
+
+    // Cleanup.
+    let _ = std::fs::remove_file(&test_file);
+}
+
 /// Verify the launcher data root resolves to a cross-privilege safe location
 /// (ProgramData on Windows) — the elevated helper must share it.
 #[test]
