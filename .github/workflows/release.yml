@@ -29,6 +29,7 @@ jobs:
 
       - name: Set version from git tag
         shell: bash
+        working-directory: .
         env:
           VER: ${{ github.ref_name }}
         run: |
